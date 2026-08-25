@@ -557,8 +557,10 @@ SVG;
         $searchPatterns = [
             'chrome/linux_arm-*/chrome-linux64/chrome',
             'chrome/linux_amd64-*/chrome-linux64/chrome',
+            'chrome/linux-*/chrome-linux64/chrome',
             'chrome-headless-shell/linux_arm-*/chrome-headless-shell-linux64/chrome-headless-shell',
             'chrome-headless-shell/linux_amd64-*/chrome-headless-shell-linux64/chrome-headless-shell',
+            'chrome-headless-shell/linux-*/chrome-headless-shell-linux64/chrome-headless-shell',
             'chrome/mac_arm-*/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
             'chrome/mac-x64-*/chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
         ];
