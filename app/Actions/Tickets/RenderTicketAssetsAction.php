@@ -100,7 +100,7 @@ class RenderTicketAssetsAction
 
         $browsershot = Browsershot::html($ticketHtml)
             ->waitUntilNetworkIdle()
-            ->setScreenshotType('png', 100)
+            ->setScreenshotType('png')
             ->deviceScaleFactor(2)
             ->showBackground()
             ->windowSize(700, 1400)
@@ -135,7 +135,7 @@ class RenderTicketAssetsAction
 
         $thumbShot = Browsershot::html($thumbHtml)
             ->waitUntilNetworkIdle()
-            ->setScreenshotType('png', 100)
+            ->setScreenshotType('png')
             ->deviceScaleFactor(2)
             ->showBackground()
             ->windowSize(860, 480)
