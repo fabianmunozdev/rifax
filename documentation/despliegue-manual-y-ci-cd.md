@@ -307,26 +307,43 @@ node -v && npm -v
 
 ### 16.3 Instalar Chromium para Browsershot (3 vias)
 
-#### Via A (recomendada) — puppeteer npm dentro del proyecto
+**PRERREQUISITO OBLIGATORIO:** Instalar las librerias compartidas que requiere Chrome for Testing en Ubuntu 24.04 Server. Sin estas, `chrome --version` reportara `libnspr4.so: cannot open shared object file` o similar, y Browsershot caera a fallback SVG:
+
+```bash
+sudo apt-get update -y
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+  libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libasound2t64 \
+  libxdamage1 libatspi2.0-0t64 libdrm2 libxkbcommon0 libxcomposite1 libxrandr2 \
+  libgbm1 libpango-1.0-0 libcairo2 libdbus-1-3 libexpat1 libx11-6 \
+  libxext6 libxfixes3 libxcb1 libx11-xcb1 fonts-liberation fonts-dejavu-core
+
+# Confirmar chrome CLI arranca
+/home/deploy/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome --version --no-sandbox
+# => Google Chrome for Testing 152.0.7977.42
+```
+
+#### Via A (recomendada) — puppeteer pnpm dentro del proyecto
+
+NOTA: este proyecto usa `pnpm` (lockfile: `pnpm-lock.yaml`). NO usar `npm ci --include=dev` (falla por ausencia de package-lock.json y npm 9 no soporta `--include=dev`).
 
 ```bash
 cd /var/www/rifax
 
-# Instalar dependencias npm (incluye puppeteer en devDependencies)
-npm ci --include=dev
+# Instalar dependencias (incluye puppeteer en devDependencies)
+pnpm install --frozen-lockfile
 
-# (pnpm alternativa) si usas pnpm en vez de npm:
-# pnpm install --frozen-lockfile
-# pnpm approve-builds puppeteer
+# pnpm >=11 desactiva scripts por defecto; hay que habilitar puppeteer build:
+pnpm approve-builds puppeteer
 
 # Forzar la descarga del binario Chromium para linux x86_64
 node node_modules/puppeteer/install.mjs
 
-# Validar que chrome se descargo
-ls -la /home/deploy/.cache/puppeteer/chrome/linux_amd64-*/chrome-linux64/chrome
+# Validar que chrome se descargo (Puppeteer 25 Hetzner x86_64 usa carpeta linux-<VERSION> SIN arch-suffix)
+ls -la /home/deploy/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome
+ls -la /home/deploy/.cache/puppeteer/chrome-headless-shell/linux-*/chrome-headless-shell-linux64/chrome-headless-shell
 ```
 
-El renderer detecta automaticamente esta ubicacion via `$HOME/.cache/puppeteer`.
+El renderer detecta automaticamente esta ubicacion via `$HOME/.cache/puppeteer`, y tambien `/var/www/.cache/puppeteer` (compartido deploy + www-data).
 
 #### Via B — Chromium del sistema (alternativa)
 
@@ -364,13 +381,38 @@ Si la deteccion automatica falla, se pueden declarar explicitamente las rutas en
 ],
 ```
 
-**`.env`** (ejemplo para Hetzner):
+**`.env`** (ejemplo para Hetzner, Puppeteer 25 linux-* sin arch-suffix):
 
 ```
 BROWSERSHOT_NODE_BINARY=/usr/bin/node
 BROWSERSHOT_NPM_BINARY=/usr/bin/npm
-BROWSERSHOT_CHROME_PATH=/home/deploy/.cache/puppeteer/chrome/linux_amd64-152.0.7977.42/chrome-linux64/chrome
+BROWSERSHOT_CHROME_PATH=/home/deploy/.cache/puppeteer/chrome/linux-152.0.7977.42/chrome-linux64/chrome
 ```
+
+NOTA sobre `BROWSERSHOT_CHROME_PATH`: si en tu server tienes diferente build number, usa glob pattern (`ls /home/deploy/.cache/puppeteer/chrome/` para ver). Prefiere siempre que sea posible la **detección automática** (sin setear env); el renderer ya recorre todos los patrones de Puppeteer 25.x incluyendo `linux-*` (sin `_amd64` ni `_arm`).
+
+### 16.4b Permisos compartidos storage/app/public/tickets (OBLIGATORIO)
+
+El directorio `storage/app/public/tickets/` suele mezclar archivos creados por **www-data** (PHP-FPM web, compras en linea) y **deploy** (artisan tinker / artisan serve / queue CLI). Para que ambos usuarios puedan escribir EN CUALQUIER subdirectorio existente, ejecuta UNA VEZ despues del primer deploy o cuando agregues dirs nuevos:
+
+```bash
+cd /var/www/rifax
+
+# Owner deploy + grupo www-data compartido
+sudo chown -R deploy:www-data storage/app/public/tickets
+sudo chown -R deploy:www-data storage/app/public/raffles
+sudo chown -R deploy:www-data storage/app/public/whatsapp-proofs
+
+# Escritura habilitada p/ ambos + setGID (nuevos dirs heredan grupo + permisos)
+sudo chmod -R u+rwX,g+rwX,o+rX storage/app/public/tickets
+sudo find storage/app/public/tickets -type d -exec chmod g+s {} \;
+sudo find storage/app/public/raffles -type d -exec chmod g+s {} \;
+sudo find storage/app/public/whatsapp-proofs -type d -exec chmod g+s {} \;
+```
+
+Sin esto, veras:
+- `filesize=0 bytes` despues de RegenerateTicketAssetsAction (Storage::put() falla silenciosamente porque deploy no puede escribir en un subdir creado por www-data con 755).
+- O `League\Flysystem\UnableToRetrieveMetadata` al intentar leer el size.
 
 Despues de cambiar `.env` o `config/services.php`:
 
@@ -384,29 +426,50 @@ sudo systemctl reload php8.5-fpm
 
 ### 16.5 Validacion post-instalacion
 
+**ANTES de regenerar:** confirma que Chrome arranca por CLI. Si falla, instala las librerias de sistema del §16.3.
+
+#### Nota de incompatibilidad Puppeteer 25.x + PNG quality
+
+Puppeteer 25.x NO acepta `quality` en screenshots PNG (solo en JPEG). Si Browsershot recibe quality en type=png, se genera: `Error: png screenshots do not support 'quality'.`. El `RenderTicketAssetsAction` oficial **NO setea quality en PNG** (usa `setScreenshotType('png')` sin segundo argumento). Si alguien agrega `->quality(100)` o `setScreenshotType('png', 100)` en el futuro, el renderer caera a fallback SVG incondicionalmente.
+
+#### Comandos de validacion
+
 ```bash
 cd /var/www/rifax
+
+# Probar chrome binario
+/home/deploy/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome --version --no-sandbox
+# => Google Chrome for Testing 152.x.x.x
+
+# Probar browsershot CLI manual (test.html simple) — NO INCLUIR quality en type=png
+echo "<html><body><div class=ticket style=\"width:620px;height:400px;background:green;color:white;font-size:40px\">OK</div></body></html>" > /tmp/test.html
+PATH=$PATH:/usr/local/bin NODE_PATH=$(npm root -g) node vendor/spatie/browsershot/bin/browser.cjs "{\"url\":\"file:///tmp/test.html\",\"action\":\"screenshot\",\"options\":{\"type\":\"png\",\"args\":[\"--no-sandbox\",\"--disable-setuid-sandbox\",\"--disable-dev-shm-usage\",\"--disable-gpu\",\"--hide-scrollbars\",\"--font-render-hinting=none\"],\"viewport\":{\"width\":700,\"height\":1400,\"deviceScaleFactor\":2},\"displayHeaderFooter\":false,\"waitUntil\":\"networkidle0\",\"acceptInsecureCerts\":true,\"executablePath\":\"/home/deploy/.cache/puppeteer/chrome/linux-152.0.7977.42/chrome-linux64/chrome\",\"selector\":\".ticket\"}}" > /tmp/testshot.png 2>&1
+wc -c /tmp/testshot.png
+# esperado > 10000 bytes
 
 # Probar renderer desde tinker
 php artisan tinker --execute="
     \$ticket = App\Models\Ticket::query()->latest('id')->first();
     if (!\$ticket) { echo 'No hay tickets'; exit(1); }
     (new App\Actions\Tickets\RegenerateTicketAssetsAction())->execute(\$ticket);
-    echo 'image_path:     ' . \$ticket->fresh()->image_path . PHP_EOL;
-    echo 'thumbnail_path: ' . \$ticket->fresh()->thumbnail_path . PHP_EOL;
+    \$fresh = \$ticket->fresh();
+    echo 'image_path:     ' . \$fresh->image_path . PHP_EOL;
+    echo 'thumbnail_path: ' . \$fresh->thumbnail_path . PHP_EOL;
+    echo 'image_size:     ' . Storage::disk('public')->size(\$fresh->image_path) . PHP_EOL;
+    echo 'thumb_size:     ' . Storage::disk('public')->size(\$fresh->thumbnail_path) . PHP_EOL;
 "
 
-# Mirar logs y confirmar renderer = browsershot-png (no legacy-svg)
-tail -30 storage/logs/laravel.log | grep renderer
+# Mirar logs y confirmar NO HAY fallback WARNING (si aparece, cat storage/logs/laravel.log | grep WARNING)
+tail -30 storage/logs/laravel.log | grep -E "WARNING|browsershot|renderer|assets"
 
-# Validar que los PNG tienen tamano > 1KB (no archivos vacios)
-ls -lah public/storage/tickets/*/ticket-v*.png | tail -5
+# Validar que los PNG tienen tamano > 50KB (no archivos vacios)
+find storage/app/public/tickets -name "ticket-v*.png" -exec ls -lah {} \; | tail -5
 
 # HTTP smoke test al ultimo ticket generado
 curl -I $(php artisan tinker --execute="echo asset('storage/'.App\Models\Ticket::query()->latest('id')->first()?->image_path);")
 ```
 
-Si `renderer = browsershot-png` y el `.png` pesa >50KB, el renderer premium esta operativo.
+Si `image_path` termina en `.png`, size >50KB y `curl -I` devuelve 200, el renderer premium esta operativo.
 
 ### 16.6 Backfill / regenerar boletos antiguos (opcional)
 
