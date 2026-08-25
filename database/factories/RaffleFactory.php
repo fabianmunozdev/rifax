@@ -29,6 +29,7 @@ class RaffleFactory extends Factory
             'number_digits' => 4,
             'min_numbers_per_purchase' => 1,
             'random_selection_by_blocks' => false,
+            'lottery_text' => 'Loteria',
             'lottery_name' => fake()->company().' Lottery',
             'lottery_draw_number' => fake()->numerify('####'),
             'draw_date' => now()->addWeek()->toDateString(),

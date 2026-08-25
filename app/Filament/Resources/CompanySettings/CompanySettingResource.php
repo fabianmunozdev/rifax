@@ -59,12 +59,19 @@ class CompanySettingResource extends BaseResource
                             ->maxLength(255),
                         TextInput::make('tax_id')
                             ->maxLength(255),
+                        TextInput::make('whatsapp_bot_phone')
+                            ->label('WhatsApp bot phone')
+                            ->required()
+                            ->tel()
+                            ->maxLength(255)
+                            ->regex('/^\+?[0-9]{8,20}$/')
+                            ->helperText('Phone used by the public web flow to continue purchases in WhatsApp with the bot.'),
                         TextInput::make('support_phone')
                             ->required()
                             ->tel()
                             ->maxLength(255)
                             ->regex('/^\+?[0-9]{8,20}$/')
-                            ->helperText('Primary WhatsApp/support phone exposed to buyers and operators.'),
+                            ->helperText('Support and operational phone used for manual help and internal payment-proof notifications.'),
                         TextInput::make('support_email')
                             ->email()
                             ->maxLength(255),
@@ -134,6 +141,9 @@ class CompanySettingResource extends BaseResource
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('support_phone')
+                    ->searchable()
+                    ->toggleable(),
+                TextColumn::make('whatsapp_bot_phone')
                     ->searchable()
                     ->toggleable(),
                 TextColumn::make('support_email')

@@ -18,6 +18,7 @@ class CompanySetting extends Model
         'trade_name',
         'legal_name',
         'tax_id',
+        'whatsapp_bot_phone',
         'support_phone',
         'support_email',
         'website_url',

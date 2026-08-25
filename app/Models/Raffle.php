@@ -30,6 +30,7 @@ class Raffle extends Model
         'number_digits',
         'min_numbers_per_purchase',
         'random_selection_by_blocks',
+        'lottery_text',
         'lottery_name',
         'lottery_draw_number',
         'draw_date',

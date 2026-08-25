@@ -21,6 +21,7 @@ class PublicLandingTest extends TestCase
     {
         CompanySetting::query()->create([
             'trade_name' => 'Rifax',
+            'whatsapp_bot_phone' => '+573009998877',
             'support_phone' => '+573001112233',
             'help_message' => 'Compra tus numeros desde la landing publica.',
             'primary_color' => '#123456',
@@ -122,19 +123,16 @@ class PublicLandingTest extends TestCase
             ->assertSee('Una rifa publica para la landing.')
             ->assertSee('Elegir numeros ahora')
             ->assertSee('Como Funciona')
-            ->assertSee('Compra Con Confianza')
+            ->assertSee('Informacion Operativa')
             ->assertSee('Preguntas Frecuentes')
             ->assertSee('Como envio el comprobante?')
             ->assertSee('Envialo directamente por WhatsApp y quedara en revision.')
-            ->assertSee('Metodos de Pago')
+            ->assertSee('Los metodos de pago visibles se confirman por WhatsApp')
+            ->assertSee('Metodos visibles:')
             ->assertSee('Nequi: 3001112233')
-            ->assertSee('Politica de Reserva y Sorteo')
-            ->assertSee('la rifa deja de aceptar nuevas reservas o compras')
-            ->assertSee('el comprobante debe enviarse antes de la hora del sorteo')
-            ->assertSee('La loteria externa publica el numero ganador oficial')
-            ->assertSee('La loteria externa publica el resultado oficial')
-            ->assertSee('Quien publica el numero ganador?')
-            ->assertSee('Que pasa si pago o envio el comprobante despues de la hora del sorteo?')
+            ->assertSee('Tus numeros se reservan por tiempo limitado mientras completas el pago.')
+            ->assertSee('Si envias el comprobante antes del sorteo, la compra queda en revision')
+            ->assertSee('Las compras pendientes deben resolverse antes de publicar el resultado final dentro de la plataforma.')
             ->assertSee('Ganadores Recientes')
             ->assertSee('Rifa Cerrada')
             ->assertSee('0042')
@@ -147,17 +145,17 @@ class PublicLandingTest extends TestCase
             ->assertSee('data-testid="mobile-sticky-cta"', escape: false)
             ->assertSee('Elegir numeros')
             ->assertSee('WhatsApp')
-            ->assertSee('https://wa.me/573001112233?text=', escape: false)
+            ->assertSee('https://wa.me/573009998877?text=', escape: false)
+            ->assertSee('https://wa.me/573001112233?text=PAGOS', escape: false)
             ->assertSee('/raffles/rifa-landing/number-picker?quantity=1&amp;source=landing_featured&amp;utm_source=meta&amp;utm_medium=social&amp;utm_campaign=lanzamiento', escape: false)
-            ->assertSee('/raffles/rifa-landing/number-picker?quantity=1&amp;source=landing_sticky&amp;utm_source=meta&amp;utm_medium=social&amp;utm_campaign=lanzamiento', escape: false)
-            ->assertSee('Catalogo total')
-            ->assertSee('Disponibles');
+            ->assertSee('/raffles/rifa-landing/number-picker?quantity=1&amp;source=landing_sticky&amp;utm_source=meta&amp;utm_medium=social&amp;utm_campaign=lanzamiento', escape: false);
     }
 
     public function test_it_hides_published_raffles_when_their_draw_time_has_already_started(): void
     {
         CompanySetting::query()->create([
             'trade_name' => 'Rifax',
+            'whatsapp_bot_phone' => '+573001112244',
             'support_phone' => '+573001112233',
             'currency_code' => 'COP',
             'default_locale' => 'es',
@@ -191,6 +189,7 @@ class PublicLandingTest extends TestCase
     {
         CompanySetting::query()->create([
             'trade_name' => 'Rifax',
+            'whatsapp_bot_phone' => '+573001112244',
             'support_phone' => '+573001112233',
             'currency_code' => 'COP',
             'default_locale' => 'es',

@@ -9,34 +9,41 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class RaffleNumberPickerController extends Controller
 {
+    protected const NUMBER_PICKER_PAGE_SIZE = 240;
+
     public function show(Raffle $raffle): View
     {
         abort_unless($raffle->salesAreOpen(), 404);
 
         $trace = $this->resolvePickerTrace(request());
         $quantity = max($raffle->min_numbers_per_purchase, (int) request()->integer('quantity', $raffle->min_numbers_per_purchase));
-        $supportPhone = CompanySetting::query()->value('support_phone');
-        $numbers = $raffle->numbers()
-            ->orderBy('number')
-            ->get(['number', 'status'])
-            ->values()
-            ->all();
-        $availableCount = collect($numbers)
+        $company = CompanySetting::query()->first();
+        $botPhone = $company?->whatsapp_bot_phone;
+        $catalogCount = $raffle->numbers()->count();
+        $availableCount = $raffle->numbers()
             ->where('status', 'available')
             ->count();
+        $initialChunk = $this->fetchNumberChunk($raffle);
 
         return view('raffles.number-picker', [
             'raffle' => $raffle,
-            'numbers' => $numbers,
+            'company' => $company,
+            'numbers' => $initialChunk['items'],
+            'catalogCount' => $catalogCount,
             'availableCount' => $availableCount,
             'quantity' => $quantity,
             'digits' => $raffle->normalizedNumberDigits(),
-            'supportPhone' => $supportPhone,
-            'supportPhoneDigits' => $this->normalizePhoneDigits($supportPhone),
+            'botPhone' => $botPhone,
+            'botPhoneDigits' => $this->normalizePhoneDigits($botPhone),
+            'numbersFeedUrl' => route('raffles.number-picker.numbers', [
+                'raffle' => $raffle->slug,
+            ]),
+            'numbersNextCursor' => $initialChunk['next_cursor'],
             'pickerIntentUrl' => route('raffles.number-picker.intents', array_filter([
                 'raffle' => $raffle->slug,
                 'source' => $trace['source'],
@@ -48,6 +55,35 @@ class RaffleNumberPickerController extends Controller
             ], fn (mixed $value): bool => $value !== null && $value !== '')),
             'pickerTrace' => $trace,
         ]);
+    }
+
+    public function numbers(Request $request, Raffle $raffle): JsonResponse
+    {
+        abort_unless($raffle->salesAreOpen(), 404);
+
+        $validator = Validator::make($request->query(), [
+            'cursor' => ['nullable', 'string', 'max:32'],
+            'search' => ['nullable', 'string', 'max:32'],
+            'per_page' => ['nullable', 'integer', 'min:24', 'max:400'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Los parametros de carga de numeros no son validos.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+
+        $chunk = $this->fetchNumberChunk(
+            $raffle,
+            cursor: Arr::get($validated, 'cursor'),
+            search: Arr::get($validated, 'search'),
+            perPage: (int) ($validated['per_page'] ?? self::NUMBER_PICKER_PAGE_SIZE),
+        );
+
+        return response()->json($chunk);
     }
 
     public function store(Request $request, Raffle $raffle): JsonResponse
@@ -227,5 +263,51 @@ class RaffleNumberPickerController extends Controller
         $normalized = trim((string) $value);
 
         return $normalized !== '' ? $normalized : null;
+    }
+
+    /**
+     * @return array{items: array<int, array{number: string, status: string, status_label: string, selectable: bool}>, next_cursor: string|null}
+     */
+    protected function fetchNumberChunk(
+        Raffle $raffle,
+        ?string $cursor = null,
+        ?string $search = null,
+        int $perPage = self::NUMBER_PICKER_PAGE_SIZE,
+    ): array {
+        $query = $raffle->numbers()
+            ->orderBy('number');
+
+        if (filled($search)) {
+            $query->where('number', 'like', '%'.trim((string) $search).'%');
+        }
+
+        if (filled($cursor)) {
+            $query->where('number', '>', trim((string) $cursor));
+        }
+
+        $items = $query
+            ->limit($perPage + 1)
+            ->get(['number', 'status']);
+
+        $hasMore = $items->count() > $perPage;
+        $pageItems = $items->take($perPage)->values();
+        $nextCursor = $hasMore ? (string) $pageItems->last()->number : null;
+
+        return [
+            'items' => $pageItems
+                ->map(fn ($number): array => [
+                    'number' => $number->number,
+                    'status' => $number->status,
+                    'status_label' => match ($number->status) {
+                        'reserved' => 'Reservado',
+                        'paid' => 'Pagado',
+                        'winner' => 'Ganador',
+                        default => 'Disponible',
+                    },
+                    'selectable' => $number->status === 'available',
+                ])
+                ->all(),
+            'next_cursor' => $nextCursor,
+        ];
     }
 }

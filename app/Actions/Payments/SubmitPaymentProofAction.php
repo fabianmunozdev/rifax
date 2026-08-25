@@ -3,6 +3,7 @@
 namespace App\Actions\Payments;
 
 use App\Actions\WhatsApp\DownloadWhatsappMediaToStorageAction;
+use App\Actions\WhatsApp\NotifySupportOfPaymentProofAction;
 use App\Models\ConversationState;
 use App\Models\Payment;
 use App\Models\PaymentProof;
@@ -11,13 +12,14 @@ use App\Models\WhatsappMessage;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Throwable;
 
 class SubmitPaymentProofAction
 {
     public function __construct(
         protected DownloadWhatsappMediaToStorageAction $downloadWhatsappMediaToStorageAction,
-    ) {
-    }
+        protected NotifySupportOfPaymentProofAction $notifySupportOfPaymentProofAction,
+    ) {}
 
     /**
      * @param  array<mixed>|null  $metadata
@@ -57,7 +59,7 @@ class SubmitPaymentProofAction
             'whatsapp_media_download_error' => $downloadError,
         ], fn (mixed $value): bool => $value !== null));
 
-        return DB::transaction(function () use ($purchase, $whatsappMessage, $storagePath, $originalFilename, $mimeType, $fileSize, $metadata): Payment {
+        $payment = DB::transaction(function () use ($purchase, $whatsappMessage, $storagePath, $originalFilename, $mimeType, $fileSize, $metadata): Payment {
             /** @var Purchase $lockedPurchase */
             $lockedPurchase = Purchase::query()->lockForUpdate()->findOrFail($purchase->id);
 
@@ -122,5 +124,13 @@ class SubmitPaymentProofAction
 
             return $payment->load('proofs');
         });
+
+        try {
+            $this->notifySupportOfPaymentProofAction->execute($payment);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
+        return $payment;
     }
 }

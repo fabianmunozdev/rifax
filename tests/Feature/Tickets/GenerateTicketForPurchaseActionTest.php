@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\WhatsappMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class GenerateTicketForPurchaseActionTest extends TestCase
@@ -65,5 +66,21 @@ class GenerateTicketForPurchaseActionTest extends TestCase
         $this->assertNotNull($secondTicket->thumbnail_path);
         $this->assertTrue(Storage::disk('public')->exists($secondTicket->image_path));
         $this->assertTrue(Storage::disk('public')->exists($secondTicket->thumbnail_path));
+
+        $ticketSvg = Storage::disk('public')->get($secondTicket->image_path);
+        $thumbnailSvg = Storage::disk('public')->get($secondTicket->thumbnail_path);
+
+        $this->assertStringContainsString($purchase->raffle_title_snapshot, $ticketSvg);
+        $this->assertStringContainsString('Lotería del sorteo', $ticketSvg);
+        $this->assertStringContainsString('Fecha del sorteo', $ticketSvg);
+        $this->assertStringContainsString('Números comprados', $ticketSvg);
+        $this->assertStringContainsString('QR de verificación', $ticketSvg);
+        $this->assertStringContainsString('URL de verificación', $ticketSvg);
+        $this->assertStringContainsString('Número de soporte', $ticketSvg);
+        $this->assertStringContainsString($secondTicket->public_url, $ticketSvg);
+        $this->assertStringContainsString('TICKET', $ticketSvg);
+        $this->assertTrue(Str::contains($ticketSvg, 'QR de verificación'));
+        $this->assertStringContainsString('Código del boleto', $thumbnailSvg);
+        $this->assertStringContainsString('Números', $thumbnailSvg);
     }
 }

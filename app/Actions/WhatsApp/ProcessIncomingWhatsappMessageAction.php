@@ -15,6 +15,7 @@ use App\Models\Raffle;
 use App\Models\RafflePickerIntent;
 use App\Models\WhatsappMessage;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -27,8 +28,7 @@ class ProcessIncomingWhatsappMessageAction
         protected SelectRandomRaffleNumbersAction $selectRandomRaffleNumbersAction,
         protected CancelPurchaseFlowAction $cancelPurchaseFlowAction,
         protected SubmitPaymentProofAction $submitPaymentProofAction,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<mixed>  $message
@@ -221,6 +221,10 @@ class ProcessIncomingWhatsappMessageAction
             return $this->handlePickerIntent($customer, $state, $pickerToken);
         }
 
+        if ($this->shouldRecoverCompletedOnboarding($customer, $state)) {
+            return $this->recoverCompletedOnboarding($customer, $state, $text);
+        }
+
         if ($this->shouldReenterClosedPurchaseFlow($state, $text)) {
             return $this->handleClosedPurchaseReentry($state, $text);
         }
@@ -232,8 +236,8 @@ class ProcessIncomingWhatsappMessageAction
             'purchase_choose_mode' => $this->handlePurchaseChooseMode($customer, $state, $text),
             'purchase_select_numbers' => $this->handlePurchaseSelectNumbers($customer, $state, $text),
             'purchase_payment_instructions', 'purchase_rejected' => $this->handlePaymentProofStep($state, $inboundMessage),
-            'purchase_under_review' => 'Tu compra sigue en revision. Te avisaremos por este medio cuando tengamos una respuesta.',
-            'purchase_paid' => 'Tu compra ya fue aprobada. Muy pronto podras consultar tu boleto desde este chat.',
+            'purchase_under_review' => 'Tu compra sigue en revisión. Te avisaremos por este medio cuando tengamos una respuesta.',
+            'purchase_paid' => 'Tu compra ya fue aprobada. Muy pronto podrás consultar tu boleto desde este chat.',
             'purchase_expired' => $this->handleExpiredState($customer, $state, $text),
             'onboarding_privacy_consent' => $this->handleOnboardingPrivacyConsent($customer, $state, $text),
             'onboarding_collect_name' => $this->handleOnboardingCollectName($customer, $state, $rawText),
@@ -303,7 +307,7 @@ class ProcessIncomingWhatsappMessageAction
                 $selectedRaffle = $raffles->values()->get(((int) $text) - 1);
 
                 if (! $selectedRaffle instanceof Raffle) {
-                    return 'Responde con el numero de la rifa que deseas comprar.'.PHP_EOL.PHP_EOL.$this->renderRaffleOptions($raffles);
+                    return 'Responde con el número de la rifa que deseas comprar.'.PHP_EOL.PHP_EOL.$this->renderRaffleOptions($raffles);
                 }
 
                 $state->forceFill([
@@ -337,7 +341,7 @@ class ProcessIncomingWhatsappMessageAction
             return $this->renderMainMenu();
         }
 
-        return 'Responde 1 para continuar o 2 para volver al menu.';
+        return 'Responde 1 para continuar o 2 para volver al menú.';
     }
 
     protected function handlePurchaseEnterQuantity(ConversationState $state, string $text): string
@@ -351,13 +355,14 @@ class ProcessIncomingWhatsappMessageAction
         }
 
         if (! ctype_digit($text) || (int) $text < 1) {
-            return 'Responde con una cantidad valida en numeros.'.PHP_EOL.PHP_EOL.'Ejemplo: 2';
+            return 'Responde con una cantidad válida en números.'.PHP_EOL.PHP_EOL.'Ejemplo: 2';
         }
 
         $quantity = (int) $text;
 
         if ($quantity < $raffle->min_numbers_per_purchase) {
-            return "La cantidad minima permitida para esta rifa es {$raffle->min_numbers_per_purchase} numero(s).".PHP_EOL.PHP_EOL.'Por favor responde con una cantidad igual o mayor.';
+            return "Lo siento, la cantidad mínima para esta rifa es {$raffle->min_numbers_per_purchase} número(s).".PHP_EOL.PHP_EOL
+                .'Intentémoslo de nuevo. ¿Cuántos números deseas comprar?';
         }
 
         $state->forceFill([
@@ -371,7 +376,7 @@ class ProcessIncomingWhatsappMessageAction
     protected function handlePurchaseChooseMode(Customer $customer, ConversationState $state, string $text): string
     {
         if (! in_array($text, ['1', '2'], true)) {
-            return 'Responde 1 para elegir manualmente o 2 para asignacion aleatoria.';
+            return 'Responde 1 para elegir manualmente o 2 para asignación aleatoria.';
         }
 
         if ($text === '1') {
@@ -408,7 +413,7 @@ class ProcessIncomingWhatsappMessageAction
         try {
             $purchase = $this->reserveNumbersAction->execute($customer, $raffle, $numbers, 'random');
         } catch (InvalidArgumentException) {
-            return 'No pudimos reservar los numeros aleatorios en este momento. Intenta nuevamente.';
+            return 'No pudimos reservar los números aleatorios en este momento. Intenta nuevamente.';
         }
 
         return $this->renderReservationConfirmation($purchase);
@@ -433,14 +438,14 @@ class ProcessIncomingWhatsappMessageAction
         $numbers = $parsedNumbers['numbers'];
 
         if (count($numbers) !== (int) $state->requested_quantity) {
-            return "Debes enviar exactamente {$state->requested_quantity} numero(s).".PHP_EOL.PHP_EOL
+            return "Debes enviar exactamente {$state->requested_quantity} número(s).".PHP_EOL.PHP_EOL
                 .'Ejemplo: '.$this->renderNumberExamples((int) $state->requested_quantity, $raffle->normalizedNumberDigits());
         }
 
         try {
             $purchase = $this->reserveNumbersAction->execute($customer, $raffle, $numbers, 'manual');
         } catch (InvalidArgumentException) {
-            return 'Uno o mas numeros no estan disponibles. Puedes elegir otros numeros o escribir MENU.';
+            return 'Uno o más números no están disponibles. Puedes elegir otros números o escribir MENU.';
         }
 
         return $this->renderReservationConfirmation($purchase);
@@ -452,7 +457,7 @@ class ProcessIncomingWhatsappMessageAction
 
         if ($inboundMessage->message_type !== 'image') {
             if ($state->status === 'purchase_rejected') {
-                return 'Tu pago fue rechazado. Envia un nuevo comprobante por imagen para continuar.'.PHP_EOL.PHP_EOL
+                return 'Tu pago fue rechazado. Envía un nuevo comprobante por imagen para continuar.'.PHP_EOL.PHP_EOL
                     .$this->renderPaymentWaitingReminder($purchase);
             }
 
@@ -475,7 +480,7 @@ class ProcessIncomingWhatsappMessageAction
             return 'No fue posible registrar el comprobante para la compra actual.';
         }
 
-        return 'Hemos recibido tu comprobante y tu compra esta en revision.'.PHP_EOL.PHP_EOL.'Te avisaremos por este medio cuando el pago sea aprobado o rechazado.';
+        return 'Hemos recibido tu comprobante y tu compra está en revisión.'.PHP_EOL.PHP_EOL.'Te avisaremos por este medio cuando el pago sea aprobado o rechazado.';
     }
 
     protected function handlePickerIntent(Customer $customer, ConversationState $state, string $token): string
@@ -486,25 +491,25 @@ class ProcessIncomingWhatsappMessageAction
             ->first();
 
         if (! $intent instanceof RafflePickerIntent) {
-            return 'No encontramos una seleccion visual valida para continuar. Vuelve al selector y genera una nueva seleccion.';
+            return 'No encontramos una selección visual válida para continuar. Vuelve al selector y genera una nueva selección.';
         }
 
         if ($intent->consumed_at !== null) {
-            return 'Esta seleccion visual ya fue usada anteriormente. Si deseas continuar, vuelve al selector y genera una nueva seleccion.';
+            return 'Esta selección visual ya fue usada anteriormente. Si deseas continuar, vuelve al selector y genera una nueva selección.';
         }
 
         if ($intent->isExpired()) {
-            return 'La seleccion visual ya vencio. Vuelve al selector de numeros y genera una nueva seleccion para continuar.';
+            return 'La selección visual ya venció. Vuelve al selector de números y genera una nueva selección para continuar.';
         }
 
         $raffle = $intent->raffle;
 
         if (! $raffle instanceof Raffle || $raffle->status !== 'published') {
-            return 'La rifa asociada a esta seleccion ya no esta disponible para compra.';
+            return 'La rifa asociada a esta selección ya no está disponible para compra.';
         }
 
         if ($state->purchase !== null && in_array($state->purchase->status, ['reserved', 'payment_submitted', 'under_review', 'rejected'], true)) {
-            return 'Ya tienes una compra en curso. Envia tu comprobante, espera la revision o escribe CANCELAR si deseas liberar tu reserva actual antes de iniciar otra compra.';
+            return 'Ya tienes una compra en curso. Envía tu comprobante, espera la revisión o escribe CANCELAR si deseas liberar tu reserva actual antes de iniciar otra compra.';
         }
 
         if (($onboardingReply = $this->redirectToPurchaseOnboardingIfNeeded($customer, $state, 'picker_intent', [
@@ -520,7 +525,7 @@ class ProcessIncomingWhatsappMessageAction
             ->all();
 
         if ($numbers === [] || count($numbers) !== $intent->quantity) {
-            return 'La seleccion visual no es valida para continuar. Vuelve al selector y genera una nueva seleccion.';
+            return 'La selección visual no es válida para continuar. Vuelve al selector y genera una nueva selección.';
         }
 
         try {
@@ -532,7 +537,7 @@ class ProcessIncomingWhatsappMessageAction
                 $this->buildPickerTraceMetadata($intent)
             );
         } catch (InvalidArgumentException) {
-            return 'La disponibilidad de los numeros seleccionados cambio antes de finalizar la compra. Vuelve al selector visual y elige nuevamente.';
+            return 'La disponibilidad de los números seleccionados cambió antes de finalizar la compra. Vuelve al selector visual y elige nuevamente.';
         }
 
         $intent->forceFill([
@@ -569,8 +574,8 @@ class ProcessIncomingWhatsappMessageAction
         }
 
         $intro = $previousStatus === 'purchase_paid'
-            ? 'Tu compra anterior ya fue aprobada. Si quieres participar de nuevo, puedes iniciar otra compra desde aqui.'
-            : 'Tu compra anterior ya termino. Si quieres participar de nuevo, puedes iniciar otra compra desde aqui.';
+            ? 'Tu compra anterior ya fue aprobada. Si quieres participar de nuevo, puedes iniciar otra compra desde aquí.'
+            : 'Tu compra anterior ya terminó. Si quieres participar de nuevo, puedes iniciar otra compra desde aquí.';
 
         return $intro.PHP_EOL.PHP_EOL.$this->renderMainMenu();
     }
@@ -615,7 +620,7 @@ class ProcessIncomingWhatsappMessageAction
             return $this->renderRaffleSelection($raffle);
         }
 
-        return 'Tu reserva ya vencio. Responde 1 para iniciar una nueva compra o escribe MENU.';
+        return 'Tu reserva ya venció. Responde 1 para iniciar una nueva compra o escribe MENU.';
     }
 
     protected function redirectToPurchaseOnboardingIfNeeded(Customer $customer, ConversationState $state, string $pendingAction, array $metadata = []): ?string
@@ -663,7 +668,7 @@ class ProcessIncomingWhatsappMessageAction
 
     protected function handleOnboardingPrivacyConsent(Customer $customer, ConversationState $state, string $text): string
     {
-        if (in_array($text, ['ACEPTO', 'ACEPTAR', 'SI ACEPTO', 'SÍ ACEPTO'], true)) {
+        if (in_array($text, ['1', 'ACEPTO', 'ACEPTAR', 'SI ACEPTO', 'SÍ ACEPTO'], true)) {
             $customer->forceFill([
                 'accepted_privacy_at' => now(),
             ])->save();
@@ -675,10 +680,10 @@ class ProcessIncomingWhatsappMessageAction
             return $this->renderCollectNamePrompt();
         }
 
-        if (in_array($text, ['NO ACEPTO', 'NO', 'RECHAZO'], true)) {
+        if (in_array($text, ['2', 'NO ACEPTO', 'NO', 'RECHAZO'], true)) {
             $this->resetToMainMenu($state);
 
-            return 'Entendido. No continuaremos con la compra sin tu autorizacion.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+            return 'Entendido. No continuaremos con la compra sin tu autorización.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
         }
 
         return $this->renderPrivacyConsentPrompt();
@@ -749,6 +754,15 @@ class ProcessIncomingWhatsappMessageAction
         unset($metadata['pending_action'], $metadata['pending_picker_token']);
 
         $state->forceFill([
+            'status' => 'main_menu',
+            'current_raffle_id' => null,
+            'requested_quantity' => null,
+            'selection_mode' => null,
+            'selected_numbers_json' => [],
+            'reservation_id' => null,
+            'purchase_id' => null,
+            'payment_id' => null,
+            'context_expires_at' => null,
             'metadata_json' => $metadata,
         ])->save();
 
@@ -759,10 +773,40 @@ class ProcessIncomingWhatsappMessageAction
         };
     }
 
+    protected function shouldRecoverCompletedOnboarding(Customer $customer, ConversationState $state): bool
+    {
+        if (! in_array($state->status, [
+            'onboarding_privacy_consent',
+            'onboarding_collect_name',
+            'onboarding_collect_document',
+        ], true)) {
+            return false;
+        }
+
+        return $this->requiredPurchaseOnboardingStatus($customer) === null;
+    }
+
+    protected function recoverCompletedOnboarding(Customer $customer, ConversationState $state, string $text): string
+    {
+        $pendingAction = (string) (($state->metadata_json ?? [])['pending_action'] ?? '');
+
+        if ($pendingAction !== '') {
+            return $this->resumePendingAction($customer, $state);
+        }
+
+        $this->resetToMainMenu($state);
+
+        return in_array($text, ['1', '2', '3', '4', '5', '6', '7'], true)
+            ? $this->handleMainMenu($customer, $state->fresh(), $text)
+            : $this->renderMainMenu();
+    }
+
     protected function renderPrivacyConsentPrompt(): string
     {
-        return 'Antes de continuar con tu compra necesitamos tu autorizacion para el tratamiento de datos personales y la aceptacion de las condiciones de compra (nombre y cedula) con el fin de gestionar tu participacion.'.PHP_EOL.PHP_EOL
-            .'Responde ACEPTO para continuar o NO ACEPTO para volver al menu.';
+        return 'Antes de continuar con tu compra necesitamos tu autorización para el tratamiento de datos personales y la aceptación de las condiciones de compra (nombre y cédula) con el fin de gestionar tu participación.'.PHP_EOL.PHP_EOL
+            .'Responde:'.PHP_EOL
+            .'1. Acepto'.PHP_EOL
+            .'2. No acepto';
     }
 
     protected function renderCollectNamePrompt(): string
@@ -772,7 +816,7 @@ class ProcessIncomingWhatsappMessageAction
 
     protected function renderCollectDocumentPrompt(): string
     {
-        return 'Ahora responde con tu numero de cedula (solo numeros).';
+        return 'Ahora responde con tu número de cédula (solo números).';
     }
 
     protected function getActiveRaffle(): ?Raffle
@@ -781,9 +825,9 @@ class ProcessIncomingWhatsappMessageAction
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, Raffle>
+     * @return Collection<int, Raffle>
      */
-    protected function getActiveRaffles(): \Illuminate\Support\Collection
+    protected function getActiveRaffles(): Collection
     {
         return Raffle::query()
             ->where('status', 'published')
@@ -825,8 +869,8 @@ class ProcessIncomingWhatsappMessageAction
         if ($rawTokens->isEmpty()) {
             return [
                 'numbers' => [],
-                'error' => 'No identificamos numeros validos en tu mensaje.'.PHP_EOL.PHP_EOL
-                    .'Envia solo numeros separados por coma o espacio. Ejemplo: '.$this->renderNumberExamples(2, $digits),
+                'error' => 'No identificamos números válidos en tu mensaje.'.PHP_EOL.PHP_EOL
+                    .'Envía solo números separados por coma o espacio. Ejemplo: '.$this->renderNumberExamples(2, $digits),
             ];
         }
 
@@ -838,8 +882,8 @@ class ProcessIncomingWhatsappMessageAction
         if ($invalidTokens !== []) {
             return [
                 'numbers' => [],
-                'error' => 'Encontramos valores invalidos: '.implode(', ', $invalidTokens).'.'.PHP_EOL.PHP_EOL
-                    ."Cada numero debe contener solo digitos y tener hasta {$digits} cifra(s)."
+                'error' => 'Encontramos valores inválidos: '.implode(', ', $invalidTokens).'.'.PHP_EOL.PHP_EOL
+                    ."Cada número debe contener solo dígitos y tener hasta {$digits} cifra(s)."
                     .PHP_EOL.'Ejemplo: '.$this->renderNumberExamples(2, $digits),
             ];
         }
@@ -855,7 +899,7 @@ class ProcessIncomingWhatsappMessageAction
         if ($duplicates !== []) {
             return [
                 'numbers' => [],
-                'error' => 'No puedes repetir numeros en la misma compra. Duplicados detectados: '.implode(', ', $duplicates).'.',
+                'error' => 'No puedes repetir números en la misma compra. Duplicados detectados: '.implode(', ', $duplicates).'.',
             ];
         }
 
@@ -870,37 +914,37 @@ class ProcessIncomingWhatsappMessageAction
         $welcome = $this->resolvePublishedContentAction->byKey(
             'system.menu.welcome',
             [],
-            'Hola, soy el asistente de Rifax. Responde con la opcion que necesitas o escribe MENU para volver aqui.',
+            'Hola, soy el asistente de Rifax. Responde con la opción que necesitas o escribe MENU para volver aquí.',
         );
 
         return $welcome.PHP_EOL.PHP_EOL
             .'Estas son tus opciones:'.PHP_EOL
             .'1. Comprar'.PHP_EOL
-            .'2. Numeros disponibles'.PHP_EOL
-            .'3. Mis numeros'.PHP_EOL
-            .'4. Estadisticas'.PHP_EOL
-            .'5. Proximas rifas'.PHP_EOL
+            .'2. Números disponibles'.PHP_EOL
+            .'3. Mis números'.PHP_EOL
+            .'4. Estadísticas'.PHP_EOL
+            .'5. Próximas rifas'.PHP_EOL
             .'6. Condiciones'.PHP_EOL
             .'7. Ayuda'.PHP_EOL.PHP_EOL
-            .'Responde con el numero de la opcion.';
+            .'Responde con el número de la opción.';
     }
 
     protected function renderRaffleSelection(Raffle $raffle): string
     {
-        return "Tenemos esta rifa activa:".PHP_EOL
+        return 'Tenemos esta rifa activa:'.PHP_EOL
             ."{$raffle->title}".PHP_EOL.PHP_EOL
-            ."Valor por numero: {$raffle->price_per_number}".PHP_EOL
-            ."Sorteo: {$raffle->lottery_name} #{$raffle->lottery_draw_number}".PHP_EOL
-            ."Fecha: {$raffle->draw_date?->format('Y-m-d')} {$raffle->draw_time}".PHP_EOL.PHP_EOL
+            .'Valor por número: '.$this->formatMoneyWithoutDecimals($raffle->price_per_number).PHP_EOL
+            .$this->formatLotteryReference($raffle).PHP_EOL
+            .'Fecha: '.$this->formatRaffleDrawDate($raffle).PHP_EOL.PHP_EOL
             .'Responde:'.PHP_EOL
             .'1. Continuar'.PHP_EOL
-            .'2. Volver al menu';
+            .'2. Volver al menú';
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, Raffle>  $raffles
+     * @param  Collection<int, Raffle>  $raffles
      */
-    protected function renderRaffleOptions(\Illuminate\Support\Collection $raffles): string
+    protected function renderRaffleOptions(Collection $raffles): string
     {
         $options = $raffles
             ->values()
@@ -908,27 +952,28 @@ class ProcessIncomingWhatsappMessageAction
                 $position = $index + 1;
 
                 return $position.'. '.$raffle->title
-                    .' | Valor: '.$raffle->price_per_number
-                    .' | Fecha: '.$raffle->draw_date?->format('Y-m-d').' '.$raffle->draw_time;
+                    .' | Valor: '.$this->formatMoneyWithoutDecimals($raffle->price_per_number)
+                    .' | '.$this->formatLotteryReference($raffle)
+                    .' | Fecha: '.$this->formatRaffleDrawDate($raffle);
             })
             ->implode(PHP_EOL);
 
         return 'Tenemos varias rifas activas disponibles.'.PHP_EOL.PHP_EOL
             .$options.PHP_EOL.PHP_EOL
-            .'Responde con el numero de la rifa que deseas comprar o escribe MENU.';
+            .'Responde con el número de la rifa que deseas comprar o escribe MENU.';
     }
 
     protected function renderQuantityPrompt(Raffle $raffle): string
     {
-        return 'Cuantos numeros deseas comprar?'.PHP_EOL.PHP_EOL
-            ."Compra minima para esta rifa: {$raffle->min_numbers_per_purchase}";
+        return '¿Cuántos números deseas comprar?'.PHP_EOL.PHP_EOL
+            ."Compra mínima para esta rifa: {$raffle->min_numbers_per_purchase}";
     }
 
     protected function renderChooseMode(): string
     {
-        return 'Como deseas elegir tus numeros?'.PHP_EOL
+        return '¿Cómo deseas elegir tus números?'.PHP_EOL
             .'1. Elegir manualmente'.PHP_EOL
-            .'2. Asignacion aleatoria';
+            .'2. Asignación aleatoria';
     }
 
     protected function renderNumberSelectionPrompt(Raffle $raffle, int $quantity): string
@@ -940,10 +985,10 @@ class ProcessIncomingWhatsappMessageAction
             'source' => 'whatsapp_manual_prompt',
         ]);
 
-        return "Envia {$quantity} numero(s) separados por coma o espacio.".PHP_EOL.PHP_EOL
-            ."Cada numero debe tener hasta {$digits} cifra(s).".PHP_EOL
+        return "Envía {$quantity} número(s) separados por coma o espacio.".PHP_EOL.PHP_EOL
+            ."Cada número debe tener hasta {$digits} cifra(s).".PHP_EOL
             .'Ejemplo: '.$this->renderNumberExamples($quantity, $digits).PHP_EOL.PHP_EOL
-            .'Si prefieres verlos en una tabla y seleccionar visualmente, abre este link:'.PHP_EOL
+            .'Si prefieres verlos en una tabla y seleccionar visualmente, abre este enlace:'.PHP_EOL
             .$pickerUrl;
     }
 
@@ -959,13 +1004,12 @@ class ProcessIncomingWhatsappMessageAction
     protected function renderReservationConfirmation(Purchase $purchase): string
     {
         $reservedNumbers = $purchase->numbers->pluck('number')->implode(', ');
-        $expiresAt = $purchase->reserved_until?->format('Y-m-d H:i');
         $paymentInstructions = $this->renderPaymentInstructionsList($purchase);
 
         $message = 'Listo. Tu reserva fue creada correctamente.'.PHP_EOL.PHP_EOL
-            .'Numeros reservados: '.$reservedNumbers.PHP_EOL
-            .'Total a pagar: '.$purchase->total_amount.PHP_EOL
-            .'Reserva valida hasta: '.$expiresAt;
+            .'Números reservados: '.$reservedNumbers.PHP_EOL
+            .'Total a pagar: '.$this->formatMoneyWithoutDecimals($purchase->total_amount).PHP_EOL
+            .$this->renderReservationWindowMessage($purchase);
 
         if ($paymentInstructions !== '') {
             $message .= PHP_EOL.PHP_EOL
@@ -974,25 +1018,44 @@ class ProcessIncomingWhatsappMessageAction
         }
 
         return $message.PHP_EOL.PHP_EOL
-            .'Despues de pagar, envia una foto clara del comprobante por este chat para continuar.';
+            .'Después de pagar, envía una foto clara del comprobante por este chat para continuar.';
+    }
+
+    protected function renderReservationWindowMessage(Purchase $purchase): string
+    {
+        $purchase->loadMissing('raffle');
+
+        $minutes = $purchase->raffle?->reservation_timeout_minutes;
+
+        if (! is_int($minutes) || $minutes < 1) {
+            $minutes = $purchase->reserved_until?->diffInMinutes(now());
+        }
+
+        if (! is_int($minutes) || $minutes < 1) {
+            return 'Tu reserva quedará activa por tiempo limitado.';
+        }
+
+        $minuteLabel = $minutes === 1 ? 'minuto' : 'minutos';
+
+        return "Tienes {$minutes} {$minuteLabel} para enviar tu comprobante de pago antes de que los números sean liberados nuevamente.";
     }
 
     protected function renderPaymentWaitingReminder(?Purchase $purchase): string
     {
         if (! $purchase instanceof Purchase) {
-            return 'Envia tu comprobante de pago por imagen en este chat para continuar.';
+            return 'Envía tu comprobante de pago por imagen en este chat para continuar.';
         }
 
         $paymentInstructions = $this->renderPaymentInstructionsList($purchase);
 
         if ($paymentInstructions === '') {
-            return 'Envia tu comprobante de pago por imagen en este chat para continuar.';
+            return 'Envía tu comprobante de pago por imagen en este chat para continuar.';
         }
 
-        return 'Aun estamos esperando tu comprobante de pago.'.PHP_EOL.PHP_EOL
+        return 'Aún estamos esperando tu comprobante de pago.'.PHP_EOL.PHP_EOL
             .'Te recuerdo las opciones de pago disponibles para esta compra:'.PHP_EOL.PHP_EOL
             .$paymentInstructions.PHP_EOL.PHP_EOL
-            .'Cuando completes el pago, envia una foto clara del comprobante por este chat.';
+            .'Cuando completes el pago, envía una foto clara del comprobante por este chat.';
     }
 
     protected function renderPaymentInstructionsList(Purchase $purchase): string
@@ -1044,7 +1107,7 @@ class ProcessIncomingWhatsappMessageAction
         if ($index !== null) {
             $lines[] = $name !== ''
                 ? "{$index}. {$name}"
-                : "{$index}. Metodo de pago";
+                : "{$index}. Método de pago";
         } elseif ($name !== '') {
             $lines[] = $name;
         }
@@ -1054,7 +1117,7 @@ class ProcessIncomingWhatsappMessageAction
         }
 
         if ($accountReference !== '') {
-            $lines[] = "Numero de cuenta: {$accountReference}";
+            $lines[] = "Número de cuenta: {$accountReference}";
         }
 
         foreach ($details as $key => $value) {
@@ -1074,7 +1137,7 @@ class ProcessIncomingWhatsappMessageAction
         }
 
         if ($instructions !== '') {
-            $lines[] = "Como pagar: {$instructions}";
+            $lines[] = "Cómo pagar: {$instructions}";
         }
 
         return implode(PHP_EOL, $lines);
@@ -1092,14 +1155,14 @@ class ProcessIncomingWhatsappMessageAction
             $raffle = $raffles->first();
             $availableCount = $raffle?->numbers()->where('status', 'available')->count();
 
-            return "La rifa {$raffle->title} tiene {$availableCount} numero(s) disponibles.".PHP_EOL.PHP_EOL.'Si deseas comprar, responde 1.';
+            return "La rifa {$raffle->title} tiene {$availableCount} número(s) disponibles.".PHP_EOL.PHP_EOL.'Si deseas comprar, responde 1.';
         }
 
         $summary = $raffles
             ->map(function (Raffle $raffle): string {
                 $availableCount = $raffle->numbers()->where('status', 'available')->count();
 
-                return "- {$raffle->title}: {$availableCount} numero(s) disponibles";
+                return "- {$raffle->title}: {$availableCount} número(s) disponibles";
             })
             ->implode(PHP_EOL);
 
@@ -1118,13 +1181,13 @@ class ProcessIncomingWhatsappMessageAction
             ->map(function (Purchase $purchase): string {
                 $numbers = $purchase->numbers->pluck('number')->implode(', ');
 
-                return "- Compra {$purchase->id}: {$purchase->status} | Numeros: {$numbers}";
+                return "- Compra {$purchase->id}: {$purchase->status} | Números: {$numbers}";
             })
             ->implode(PHP_EOL);
 
         return $summary !== ''
             ? 'Estas son tus compras registradas:'.PHP_EOL.$summary
-            : 'Aun no tienes compras registradas.';
+            : 'Aún no tienes compras registradas.';
     }
 
     protected function renderStatistics(): string
@@ -1143,8 +1206,8 @@ class ProcessIncomingWhatsappMessageAction
             return "Estado actual de {$raffle->title}:".PHP_EOL
                 ."- Vendidos: {$soldCount}".PHP_EOL
                 ."- Disponibles: {$availableCount}".PHP_EOL
-                ."- Sorteo: {$raffle->lottery_name} #{$raffle->lottery_draw_number}".PHP_EOL
-                ."- Fecha: {$raffle->draw_date?->format('Y-m-d')} {$raffle->draw_time}";
+                .'- '.$this->formatLotteryReference($raffle).PHP_EOL
+                .'- Fecha: '.$this->formatRaffleDrawDate($raffle);
         }
 
         $summary = $raffles
@@ -1155,12 +1218,12 @@ class ProcessIncomingWhatsappMessageAction
                 return $raffle->title.PHP_EOL
                     ."- Vendidos: {$soldCount}".PHP_EOL
                     ."- Disponibles: {$availableCount}".PHP_EOL
-                    ."- Sorteo: {$raffle->lottery_name} #{$raffle->lottery_draw_number}".PHP_EOL
-                    ."- Fecha: {$raffle->draw_date?->format('Y-m-d')} {$raffle->draw_time}";
+                    .'- '.$this->formatLotteryReference($raffle).PHP_EOL
+                    .'- Fecha: '.$this->formatRaffleDrawDate($raffle);
             })
             ->implode(PHP_EOL.PHP_EOL);
 
-        return 'Estas son las estadisticas de las rifas activas:'.PHP_EOL.PHP_EOL.$summary;
+        return 'Estas son las estadísticas de las rifas activas:'.PHP_EOL.PHP_EOL.$summary;
     }
 
     protected function renderConditions(): string
@@ -1170,10 +1233,10 @@ class ProcessIncomingWhatsappMessageAction
             [],
             'Estas son las condiciones principales de la rifa:'.PHP_EOL
             .'- La compra se realiza por este chat.'.PHP_EOL
-            .'- Los numeros se reservan por tiempo limitado.'.PHP_EOL
+            .'- Los números se reservan por tiempo limitado.'.PHP_EOL
             .'- El pago se confirma manualmente.'.PHP_EOL
-            .'- El boleto se envia cuando el pago es aprobado.'.PHP_EOL.PHP_EOL
-            .'Si deseas comprar, responde 1. Si deseas volver al menu, escribe MENU.',
+            .'- El boleto se envía cuando el pago es aprobado.'.PHP_EOL.PHP_EOL
+            .'Si deseas comprar, responde 1. Si deseas volver al menú, escribe MENU.',
         );
     }
 
@@ -1184,7 +1247,7 @@ class ProcessIncomingWhatsappMessageAction
             [],
             'Puedo ayudarte con:'.PHP_EOL
             .'1. Condiciones de la rifa'.PHP_EOL
-            .'2. Metodos de pago'.PHP_EOL
+            .'2. Métodos de pago'.PHP_EOL
             .'3. Estado de tu compra'.PHP_EOL
             .'4. Hablar con soporte',
         );
@@ -1195,7 +1258,7 @@ class ProcessIncomingWhatsappMessageAction
         $base = $this->resolvePublishedContentAction->byIntent(
             'upcoming_raffles',
             [],
-            'Pronto compartiremos las proximas rifas disponibles. Escribe MENU para volver.',
+            'Pronto compartiremos las próximas rifas disponibles. Escribe MENU para volver.',
         );
 
         $raffles = $this->getActiveRaffles();
@@ -1205,10 +1268,66 @@ class ProcessIncomingWhatsappMessageAction
         }
 
         $summary = $raffles
-            ->map(fn (Raffle $raffle): string => "- {$raffle->title}: {$raffle->draw_date?->format('Y-m-d')} {$raffle->draw_time} | {$raffle->lottery_name} #{$raffle->lottery_draw_number}")
+            ->map(fn (Raffle $raffle): string => "- {$raffle->title}: ".$this->formatRaffleDrawDate($raffle).' | '.$this->formatLotteryReference($raffle))
             ->implode(PHP_EOL);
 
         return $base.PHP_EOL.PHP_EOL.'Rifas activas actuales:'.PHP_EOL.$summary;
+    }
+
+    protected function formatMoneyWithoutDecimals(mixed $amount): string
+    {
+        if (! is_numeric($amount)) {
+            return '$0';
+        }
+
+        return '$'.number_format((float) $amount, 0, ',', '.');
+    }
+
+    protected function formatRaffleDrawDate(Raffle $raffle): string
+    {
+        $drawAt = $raffle->drawAt();
+
+        if ($drawAt === null) {
+            return 'Fecha pendiente por confirmar';
+        }
+
+        $drawAt = $drawAt->copy()->locale('es');
+        $month = Str::ucfirst($drawAt->translatedFormat('F'));
+
+        return $drawAt->translatedFormat('j').' de '.$month.' de '.$drawAt->translatedFormat('Y')
+            .' a las '.$drawAt->format('g:i A');
+    }
+
+    protected function formatLotteryReference(Raffle $raffle): string
+    {
+        $lotteryName = trim((string) ($raffle->lottery_name ?? ''));
+        $lotteryText = trim((string) ($raffle->lottery_text ?? ''));
+        $drawNumber = trim((string) ($raffle->lottery_draw_number ?? ''));
+
+        if ($lotteryText !== '') {
+            $segments = [];
+            $headline = trim($lotteryText.' '.$lotteryName);
+
+            if ($headline !== '') {
+                $segments[] = $headline;
+            }
+
+            if ($drawNumber !== '') {
+                $segments[] = 'sorteo #'.$drawNumber;
+            }
+
+            return implode(' ', $segments);
+        }
+
+        if ($lotteryName === '') {
+            return $drawNumber !== ''
+                ? 'Sorteo: #'.$drawNumber
+                : 'Sorteo: Referencia pendiente';
+        }
+
+        return $drawNumber !== ''
+            ? "Sorteo: {$lotteryName} #{$drawNumber}"
+            : "Sorteo: {$lotteryName}";
     }
 
     protected function extractPickerIntentToken(string $text): ?string
@@ -1247,7 +1366,7 @@ class ProcessIncomingWhatsappMessageAction
 
     protected function isFaqShortcut(string $text): bool
     {
-        return in_array($text, ['AYUDA', 'CONDICIONES', 'PAGOS', 'METODOS DE PAGO', 'SORTEO'], true);
+        return in_array($text, ['AYUDA', 'CONDICIONES', 'PAGOS', 'METODOS DE PAGO', 'MÉTODOS DE PAGO', 'SORTEO'], true);
     }
 
     protected function isGreeting(string $text): bool
@@ -1257,7 +1376,9 @@ class ProcessIncomingWhatsappMessageAction
             'HOLA!',
             'BUENAS',
             'BUEN DIA',
+            'BUEN DÍA',
             'BUENOS DIAS',
+            'BUENOS DÍAS',
             'BUENAS TARDES',
             'BUENAS NOCHES',
         ], true);
@@ -1282,7 +1403,7 @@ class ProcessIncomingWhatsappMessageAction
         return match ($text) {
             'AYUDA' => $this->renderHelp(),
             'CONDICIONES' => $this->renderConditions(),
-            'PAGOS', 'METODOS DE PAGO' => $this->renderPaymentMethods(),
+            'PAGOS', 'METODOS DE PAGO', 'MÉTODOS DE PAGO' => $this->renderPaymentMethods(),
             'SORTEO' => $this->renderDrawDate($state),
             default => $this->renderMainMenu(),
         };
@@ -1293,7 +1414,7 @@ class ProcessIncomingWhatsappMessageAction
         $base = $this->resolvePublishedContentAction->byIntent(
             'payment_methods',
             [],
-            'Puedes pagar usando los metodos habilitados por la empresa. Te enviaremos las instrucciones exactas dentro del flujo de compra.',
+            'Puedes pagar usando los métodos habilitados por la empresa. Te enviaremos las instrucciones exactas dentro del flujo de compra.',
         );
 
         $methods = PaymentMethod::query()

@@ -128,6 +128,9 @@ class RaffleResource extends BaseResource
                 Section::make(__('admin.resources.raffles.sections.lottery'))
                     ->columns(2)
                     ->schema([
+                        TextInput::make('lottery_text')
+                            ->label('Texto loteria')
+                            ->maxLength(255),
                         TextInput::make('lottery_name')
                             ->label(__('admin.resources.raffles.fields.lottery'))
                             ->maxLength(255),
@@ -208,6 +211,9 @@ class RaffleResource extends BaseResource
                 Section::make(__('admin.resources.raffles.sections.lottery'))
                     ->columns(2)
                     ->schema([
+                        TextEntry::make('lottery_text')
+                            ->label('Texto loteria')
+                            ->placeholder('-'),
                         TextEntry::make('lottery_name')
                             ->label(__('admin.resources.raffles.fields.lottery'))
                             ->placeholder('-'),

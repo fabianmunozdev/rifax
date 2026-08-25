@@ -69,6 +69,7 @@ class PublicLandingController extends Controller
             'paymentMethods' => $paymentMethods,
             'recentResults' => $recentResults,
             'publicFaqEntries' => $publicFaqEntries,
+            'botPhoneDigits' => $this->normalizePhoneDigits($company?->whatsapp_bot_phone),
             'supportPhoneDigits' => $this->normalizePhoneDigits($company?->support_phone),
         ]);
     }

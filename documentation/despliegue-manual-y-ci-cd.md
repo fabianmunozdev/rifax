@@ -272,3 +272,171 @@ El siguiente documento o trabajo operativo ideal es:
 - despliegue por `SSH`
 - reinicio controlado de servicios
 - validacion automatica minima despues del release
+
+## 16. Boleto Premium — Instalar Chromium (render PNG con Browsershot)
+
+Desde esta version, la generacion de boletos usa **Spatie\Browsershot + Puppeteer/Chromium** para producir boletos PNG de alta calidad con estetica premium (fondo oscuro, acentos dorados, grilla 4 columnas, 1 premio, QR en footer).
+
+Si Chromium no esta disponible en el servidor, el pipeline **automaticamente cae en fallback SVG legado** (no se pierde ningun boleto, solo se mantiene el diseño anterior).
+
+### 16.1 Estado actual del pipeline
+
+- Renderer productivo en: `app/Actions/Tickets/RenderTicketAssetsAction.php`
+- Plantillas Blade: `resources/views/tickets/render.blade.php` y `render-thumbnail.blade.php`
+- Extension guardada: `.png` si Browsershot funciona; `.svg` si cae en fallback.
+- Todos los consumidores (verificacion publica, envio WhatsApp, panel admin) son **agnosticos a la extension** (usan `asset('storage/'.$path)` generico).
+
+### 16.2 Prerrequisitos en Hetzner CX23 (95.217.177.163)
+
+**Node 20+ y npm** deben estar disponibles para el usuario `deploy` y para `www-data` (PHP-FPM). Validar:
+
+```bash
+ssh deploy@95.217.177.163
+node -v   # >= 20
+npm -v    # >= 10
+```
+
+Si faltan:
+
+```bash
+# NodeSource (Ubuntu 24.04 amd64)
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node -v && npm -v
+```
+
+### 16.3 Instalar Chromium para Browsershot (3 vias)
+
+#### Via A (recomendada) — puppeteer npm dentro del proyecto
+
+```bash
+cd /var/www/rifax
+
+# Instalar dependencias npm (incluye puppeteer en devDependencies)
+npm ci --include=dev
+
+# (pnpm alternativa) si usas pnpm en vez de npm:
+# pnpm install --frozen-lockfile
+# pnpm approve-builds puppeteer
+
+# Forzar la descarga del binario Chromium para linux x86_64
+node node_modules/puppeteer/install.mjs
+
+# Validar que chrome se descargo
+ls -la /home/deploy/.cache/puppeteer/chrome/linux_amd64-*/chrome-linux64/chrome
+```
+
+El renderer detecta automaticamente esta ubicacion via `$HOME/.cache/puppeteer`.
+
+#### Via B — Chromium del sistema (alternativa)
+
+```bash
+sudo apt-get install -y chromium-browser
+# Validar
+/usr/bin/chromium-browser --version
+```
+
+El renderer tambien detecta `/usr/bin/chromium-browser` como ultimo fallback.
+
+#### Via C — Usar cache global compartido www-data + deploy
+
+```bash
+# Ubicacion global que ambos usuarios pueden leer
+sudo mkdir -p /var/www/.cache/puppeteer
+sudo chown -R deploy:www-data /var/www/.cache
+sudo chmod -R u+rwX,g+rwX,o+rX /var/www/.cache
+
+# Como usuario deploy
+PUPPETEER_CACHE_DIR=/var/www/.cache/puppeteer node /var/www/rifax/node_modules/puppeteer/install.mjs
+```
+
+### 16.4 Configuracion opcional (override manual)
+
+Si la deteccion automatica falla, se pueden declarar explicitamente las rutas en `config/services.php` o via `.env`:
+
+**`config/services.php`** (solo si hace falta):
+
+```php
+'browsershot' => [
+    'node_binary'  => env('BROWSERSHOT_NODE_BINARY'),
+    'npm_binary'   => env('BROWSERSHOT_NPM_BINARY'),
+    'chrome_path'  => env('BROWSERSHOT_CHROME_PATH'),
+],
+```
+
+**`.env`** (ejemplo para Hetzner):
+
+```
+BROWSERSHOT_NODE_BINARY=/usr/bin/node
+BROWSERSHOT_NPM_BINARY=/usr/bin/npm
+BROWSERSHOT_CHROME_PATH=/home/deploy/.cache/puppeteer/chrome/linux_amd64-152.0.7977.42/chrome-linux64/chrome
+```
+
+Despues de cambiar `.env` o `config/services.php`:
+
+```bash
+cd /var/www/rifax
+php artisan optimize:clear
+php artisan optimize
+sudo supervisorctl restart rifax-worker
+sudo systemctl reload php8.5-fpm
+```
+
+### 16.5 Validacion post-instalacion
+
+```bash
+cd /var/www/rifax
+
+# Probar renderer desde tinker
+php artisan tinker --execute="
+    \$ticket = App\Models\Ticket::query()->latest('id')->first();
+    if (!\$ticket) { echo 'No hay tickets'; exit(1); }
+    (new App\Actions\Tickets\RegenerateTicketAssetsAction())->execute(\$ticket);
+    echo 'image_path:     ' . \$ticket->fresh()->image_path . PHP_EOL;
+    echo 'thumbnail_path: ' . \$ticket->fresh()->thumbnail_path . PHP_EOL;
+"
+
+# Mirar logs y confirmar renderer = browsershot-png (no legacy-svg)
+tail -30 storage/logs/laravel.log | grep renderer
+
+# Validar que los PNG tienen tamano > 1KB (no archivos vacios)
+ls -lah public/storage/tickets/*/ticket-v*.png | tail -5
+
+# HTTP smoke test al ultimo ticket generado
+curl -I $(php artisan tinker --execute="echo asset('storage/'.App\Models\Ticket::query()->latest('id')->first()?->image_path);")
+```
+
+Si `renderer = browsershot-png` y el `.png` pesa >50KB, el renderer premium esta operativo.
+
+### 16.6 Backfill / regenerar boletos antiguos (opcional)
+
+Por defecto, los boletos emitidos **antes** de instalar Chromium siguen en SVG (su URL no cambia, no hay links rotos).
+
+Si quieres regenerar TODOS los boletos historicos con el nuevo diseño PNG:
+
+```bash
+cd /var/www/rifax
+
+# Opcion A: comando one-liner (puede tardar varios minutos)
+php artisan tinker --execute="
+    App\Models\Ticket::query()
+        ->whereNotNull('id')
+        ->orderBy('id')
+        ->chunk(100, function (\$chunk) {
+            foreach (\$chunk as \$t) {
+                try {
+                    (new App\Actions\Tickets\RegenerateTicketAssetsAction())->execute(\$t);
+                    echo \"OK ticket_id={$t->id} code={$t->code}\n\";
+                } catch (\Throwable \$e) {
+                    echo \"FAIL ticket_id={$t->id}: {\$e->getMessage()}\n\";
+                }
+            }
+        });
+"
+```
+
+Ejecuta primero con 1 ticket de prueba antes de lanzar el backfill completo.
+
+### 16.7 Que pasa si Chromium no se instala
+
+Nada se rompe. El `RenderTicketAssetsAction` envuelve la llamada a Browsershot en `try/catch Throwable` y, ante CUALQUIER error, registra un `Log::warning('Ticket browsershot render failed, falling back to SVG.')` y produce el boleto SVG legado. Todos los flujos siguen funcionando; solo no tendran el estilo premium PNG hasta que se instale Chromium.

@@ -12,7 +12,7 @@ class CompanySettingFormValidationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_company_setting_requires_support_phone_help_message_and_a_valid_currency_code(): void
+    public function test_company_setting_requires_bot_phone_support_phone_help_message_and_a_valid_currency_code(): void
     {
         $this->actingAs(User::factory()->admin()->create());
 
@@ -21,6 +21,7 @@ class CompanySettingFormValidationTest extends TestCase
                 'trade_name' => 'Rifax',
                 'legal_name' => 'Rifax SAS',
                 'tax_id' => '900000000-1',
+                'whatsapp_bot_phone' => null,
                 'support_phone' => null,
                 'support_email' => 'soporte@rifax.test',
                 'website_url' => 'https://rifax.test',
@@ -37,6 +38,7 @@ class CompanySettingFormValidationTest extends TestCase
             ])
             ->call('create')
             ->assertHasErrors([
+                'data.whatsapp_bot_phone',
                 'data.support_phone',
                 'data.currency_code',
                 'data.help_message',

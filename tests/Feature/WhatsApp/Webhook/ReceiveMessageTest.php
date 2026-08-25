@@ -9,8 +9,8 @@ use App\Models\Customer;
 use App\Models\PaymentMethod;
 use App\Models\Purchase;
 use App\Models\Raffle;
-use App\Models\RafflePickerIntent;
 use App\Models\RaffleNumber;
+use App\Models\RafflePickerIntent;
 use App\Models\WhatsappMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -61,6 +61,12 @@ class ReceiveMessageTest extends TestCase
     {
         $raffle = Raffle::factory()->published()->create([
             'title' => 'Rifa Onboarding',
+            'price_per_number' => 4000,
+            'lottery_text' => 'Loteria',
+            'lottery_name' => 'Bogota',
+            'lottery_draw_number' => '123123',
+            'draw_date' => '2026-08-05',
+            'draw_time' => '22:00:00',
         ]);
 
         RaffleNumber::factory()->for($raffle)->count(3)->create();
@@ -70,9 +76,10 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'onboarding_privacy_consent');
 
-        $this->assertStringContainsString('ACEPTO', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('1. Acepto', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('2. No acepto', $response->json('responses.0.reply'));
 
-        $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', 'ACEPTO'));
+        $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', '1'));
 
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'onboarding_collect_name');
@@ -100,6 +107,9 @@ class ReceiveMessageTest extends TestCase
         $customer->refresh();
         $this->assertSame('123456789', $customer->document_number);
         $this->assertStringContainsString('Rifa Onboarding', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Valor por número: $4.000', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Loteria Bogota sorteo #123123', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Fecha: 5 de Agosto de 2026 a las 10:00 PM', $response->json('responses.0.reply'));
     }
 
     public function test_it_requests_name_after_privacy_acceptance_even_if_whatsapp_profile_name_exists(): void
@@ -122,7 +132,7 @@ class ReceiveMessageTest extends TestCase
 
         $response = $this->postSignedWhatsappWebhook($this->textPayload(
             '573001112233',
-            'ACEPTO',
+            '1',
             'wamid.profile-consent',
             'FabianM',
         ));
@@ -130,7 +140,7 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'onboarding_collect_name');
 
-        $this->assertStringContainsString('nombre completo', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('nombre completo', strtolower($response->json('responses.0.reply')));
     }
 
     public function test_it_is_idempotent_when_meta_retries_the_same_inbound_message(): void
@@ -189,7 +199,7 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'onboarding_privacy_consent');
 
-        $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', 'ACEPTO'));
+        $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', '1'));
 
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'onboarding_collect_name');
@@ -205,6 +215,68 @@ class ReceiveMessageTest extends TestCase
         ]);
         $this->assertDatabaseHas('purchase_numbers', [
             'number' => '543',
+        ]);
+    }
+
+    public function test_it_returns_to_the_main_menu_after_onboarding_when_there_are_no_active_raffles(): void
+    {
+        $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', '1'));
+
+        $response->assertOk()
+            ->assertJsonPath('responses.0.conversation_status', 'onboarding_privacy_consent');
+
+        $this->postSignedWhatsappWebhook($this->textPayload('573001112233', '1'))
+            ->assertJsonPath('responses.0.conversation_status', 'onboarding_collect_name');
+
+        $this->postSignedWhatsappWebhook($this->textPayload('573001112233', 'Juan Perez'))
+            ->assertJsonPath('responses.0.conversation_status', 'onboarding_collect_document');
+
+        $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', '123456789'));
+
+        $response->assertOk()
+            ->assertJsonPath('responses.0.conversation_status', 'main_menu');
+
+        $this->assertStringContainsString('no tenemos una rifa activa disponible', strtolower($response->json('responses.0.reply')));
+
+        $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', 'hola'));
+
+        $response->assertOk()
+            ->assertJsonPath('responses.0.conversation_status', 'main_menu');
+
+        $this->assertStringContainsString('Estas son tus opciones', $response->json('responses.0.reply'));
+
+        $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', '2'));
+
+        $response->assertOk()
+            ->assertJsonPath('responses.0.conversation_status', 'main_menu');
+
+        $this->assertStringNotContainsString('cedula', strtolower($response->json('responses.0.reply')));
+    }
+
+    public function test_it_recovers_stale_completed_onboarding_states_before_processing_menu_options(): void
+    {
+        $customer = Customer::factory()->create([
+            'phone' => '+573001112233',
+            'wa_id' => '573001112233',
+            'name' => 'Juan Perez',
+            'document_number' => '123456789',
+            'accepted_privacy_at' => now(),
+        ]);
+
+        ConversationState::factory()->for($customer)->create([
+            'status' => 'onboarding_collect_document',
+            'metadata_json' => [],
+        ]);
+
+        $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', '2'));
+
+        $response->assertOk()
+            ->assertJsonPath('responses.0.conversation_status', 'main_menu');
+
+        $this->assertStringNotContainsString('cedula', strtolower($response->json('responses.0.reply')));
+        $this->assertDatabaseHas('conversation_states', [
+            'customer_id' => $customer->id,
+            'status' => 'main_menu',
         ]);
     }
 
@@ -244,7 +316,8 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'purchase_enter_quantity');
 
-        $this->assertStringContainsString('La cantidad minima permitida', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Lo siento, la cantidad mínima para esta rifa es 3 número(s).', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Intentémoslo de nuevo. ¿Cuántos números deseas comprar?', $response->json('responses.0.reply'));
     }
 
     public function test_it_requires_a_numeric_quantity_before_continuing(): void
@@ -265,7 +338,7 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'purchase_enter_quantity');
 
-        $this->assertStringContainsString('cantidad valida', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('cantidad válida', strtolower($response->json('responses.0.reply')));
     }
 
     public function test_it_accepts_manual_numbers_using_the_configured_raffle_digits(): void
@@ -306,10 +379,11 @@ class ReceiveMessageTest extends TestCase
             ->assertJsonPath('responses.0.conversation_status', 'purchase_payment_instructions');
 
         $this->assertStringContainsString('Opciones de pago disponibles', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Tienes 15 minutos para enviar tu comprobante de pago antes de que los números sean liberados nuevamente.', $response->json('responses.0.reply'));
         $this->assertStringContainsString('1. Transferencia', $response->json('responses.0.reply'));
-        $this->assertStringContainsString('Numero de cuenta: 123456789', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Número de cuenta: 123456789', $response->json('responses.0.reply'));
         $this->assertStringContainsString('Titular: Rifax SAS', $response->json('responses.0.reply'));
-        $this->assertStringContainsString('Como pagar: Transfiere y envia el comprobante.', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Cómo pagar: Transfiere y envia el comprobante.', $response->json('responses.0.reply'));
         $this->assertDatabaseHas('purchase_numbers', [
             'number' => '001',
         ]);
@@ -470,7 +544,7 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'main_menu');
 
-        $this->assertStringContainsString('seleccion visual ya vencio', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('selección visual ya venció', strtolower($response->json('responses.0.reply')));
         $this->assertDatabaseCount('purchases', 0);
     }
 
@@ -496,7 +570,7 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'purchase_select_numbers');
 
-        $this->assertStringContainsString('valores invalidos', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('valores inválidos', strtolower($response->json('responses.0.reply')));
     }
 
     public function test_it_rejects_duplicate_manual_numbers_before_reserving(): void
@@ -521,7 +595,7 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'purchase_select_numbers');
 
-        $this->assertStringContainsString('duplicados detectados', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('duplicados detectados', strtolower($response->json('responses.0.reply')));
     }
 
     public function test_it_assigns_random_numbers_using_the_configured_raffle_digits(): void
@@ -747,7 +821,7 @@ class ReceiveMessageTest extends TestCase
             'status' => 'pending_review',
         ]);
 
-        $this->assertStringContainsString('tu compra esta en revision', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('tu compra está en revisión', strtolower($response->json('responses.0.reply')));
     }
 
     public function test_it_repeats_configured_payment_accounts_while_waiting_for_payment_proof(): void
@@ -780,9 +854,9 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'purchase_payment_instructions');
 
-        $this->assertStringContainsString('Aun estamos esperando tu comprobante de pago', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Aún estamos esperando tu comprobante de pago', $response->json('responses.0.reply'));
         $this->assertStringContainsString('Te recuerdo las opciones de pago disponibles para esta compra', $response->json('responses.0.reply'));
-        $this->assertStringContainsString('Numero de cuenta: 123456789', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Número de cuenta: 123456789', $response->json('responses.0.reply'));
         $this->assertStringContainsString('Titular: Rifax SAS', $response->json('responses.0.reply'));
     }
 
@@ -807,8 +881,8 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'main_menu');
 
-        $this->assertStringContainsString('tu compra anterior ya fue aprobada', Strtolower($response->json('responses.0.reply')));
-        $this->assertStringContainsString('estas son tus opciones', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('tu compra anterior ya fue aprobada', strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('estas son tus opciones', strtolower($response->json('responses.0.reply')));
     }
 
     public function test_comprar_from_a_paid_purchase_reopens_the_purchase_flow(): void
@@ -901,8 +975,8 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'main_menu');
 
-        $this->assertStringContainsString('tu compra anterior ya termino', Strtolower($response->json('responses.0.reply')));
-        $this->assertStringContainsString('estas son tus opciones', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('tu compra anterior ya terminó', strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('estas son tus opciones', strtolower($response->json('responses.0.reply')));
     }
 
     public function test_it_lists_multiple_published_raffles_before_choosing_one(): void
@@ -932,7 +1006,7 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'purchase_select_raffle');
 
-        $this->assertStringContainsString('varias rifas activas', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('varias rifas activas', strtolower($response->json('responses.0.reply')));
         $this->assertStringContainsString('Rifa Uno', $response->json('responses.0.reply'));
         $this->assertStringContainsString('Rifa Dos', $response->json('responses.0.reply'));
 
@@ -973,7 +1047,7 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'purchase_enter_quantity');
 
-        $this->assertStringContainsString('Cuantos numeros deseas comprar', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('¿Cuántos números deseas comprar?', $response->json('responses.0.reply'));
         $this->assertDatabaseHas('conversation_states', [
             'customer_id' => $customer->id,
             'status' => 'purchase_enter_quantity',
@@ -1003,8 +1077,8 @@ class ReceiveMessageTest extends TestCase
 
         $this->assertStringContainsString('Rifa Disponible Uno', $response->json('responses.0.reply'));
         $this->assertStringContainsString('Rifa Disponible Dos', $response->json('responses.0.reply'));
-        $this->assertStringContainsString('1 numero(s) disponibles', $response->json('responses.0.reply'));
-        $this->assertStringContainsString('2 numero(s) disponibles', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('1 número(s) disponibles', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('2 número(s) disponibles', $response->json('responses.0.reply'));
     }
 
     public function test_statistics_lists_all_active_raffles_when_more_than_one_is_published(): void
@@ -1088,7 +1162,7 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'main_menu');
 
-        $this->assertStringContainsString('fechas de sorteo', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('fechas de sorteo', strtolower($response->json('responses.0.reply')));
         $this->assertStringContainsString('Rifa Sorteo Uno', $response->json('responses.0.reply'));
         $this->assertStringContainsString('Rifa Sorteo Dos', $response->json('responses.0.reply'));
     }
@@ -1134,7 +1208,7 @@ class ReceiveMessageTest extends TestCase
             'status' => 'available',
         ]);
 
-        $this->assertStringContainsString('reserva liberada', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('reserva liberada', strtolower($response->json('responses.0.reply')));
     }
 
     public function test_it_rejects_a_payment_proof_when_there_is_no_purchase_waiting_for_it(): void
@@ -1149,7 +1223,7 @@ class ReceiveMessageTest extends TestCase
             ->assertJsonPath('responses.0.conversation_status', 'main_menu');
 
         $this->assertDatabaseCount('payments', 0);
-        $this->assertStringContainsString('no estamos esperando un comprobante', Strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('no estamos esperando un comprobante', strtolower($response->json('responses.0.reply')));
     }
 
     public function test_it_uses_the_published_content_entry_for_payment_methods_shortcuts(): void

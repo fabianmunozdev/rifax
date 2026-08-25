@@ -17,6 +17,7 @@ class RaffleNumberPickerPageTest extends TestCase
     {
         CompanySetting::query()->create([
             'trade_name' => 'Rifax',
+            'whatsapp_bot_phone' => '+573009994455',
             'support_phone' => '+573001112233',
             'currency_code' => 'COP',
             'default_locale' => 'es',
@@ -61,8 +62,9 @@ class RaffleNumberPickerPageTest extends TestCase
             ->assertSee('Reservado')
             ->assertSee('Pagado')
             ->assertSee('Ganador')
-            ->assertSee('2 disponible(s)')
-            ->assertSee('573001112233')
+            ->assertSee('Disponibles ahora:')
+            ->assertSee('Disponibles ahora: 2')
+            ->assertSee('573009994455')
             ->assertSee('0 seleccionados de 2', escape: false)
             ->assertSee('Continuar compra por WhatsApp')
             ->assertSee('Se abrira un mensaje listo para enviar. No necesitas editarlo.')
@@ -92,6 +94,51 @@ class RaffleNumberPickerPageTest extends TestCase
         $response = $this->get('/raffles/'.$raffle->slug.'/number-picker');
 
         $response->assertNotFound();
+    }
+
+    public function test_it_returns_number_chunks_for_incremental_loading(): void
+    {
+        $raffle = Raffle::factory()->published()->create([
+            'slug' => 'rifa-feed',
+            'number_digits' => 3,
+        ]);
+
+        foreach (range(1, 30) as $number) {
+            RaffleNumber::factory()->for($raffle)->create([
+                'number' => str_pad((string) $number, 3, '0', STR_PAD_LEFT),
+                'status' => $number % 7 === 0 ? 'reserved' : 'available',
+            ]);
+        }
+
+        $response = $this->getJson('/raffles/rifa-feed/number-picker/numbers?per_page=24');
+
+        $response->assertOk()
+            ->assertJsonCount(24, 'items')
+            ->assertJsonPath('items.0.number', '001')
+            ->assertJsonPath('items.0.status_label', 'Disponible')
+            ->assertJsonPath('items.6.number', '007')
+            ->assertJsonPath('items.6.status_label', 'Reservado')
+            ->assertJsonPath('next_cursor', '024');
+
+        $nextResponse = $this->getJson('/raffles/rifa-feed/number-picker/numbers?per_page=24&cursor=024');
+
+        $nextResponse->assertOk()
+            ->assertJsonCount(6, 'items')
+            ->assertJsonPath('items.0.number', '025')
+            ->assertJsonPath('next_cursor', null);
+    }
+
+    public function test_it_returns_json_validation_errors_for_invalid_number_chunk_params(): void
+    {
+        $raffle = Raffle::factory()->published()->create([
+            'slug' => 'rifa-feed-invalida',
+        ]);
+
+        $response = $this->get('/raffles/'.$raffle->slug.'/number-picker/numbers?per_page=5');
+
+        $response->assertUnprocessable()
+            ->assertJsonPath('message', 'Los parametros de carga de numeros no son validos.')
+            ->assertJsonValidationErrors(['per_page']);
     }
 
     public function test_it_creates_a_picker_intent_for_available_numbers(): void
