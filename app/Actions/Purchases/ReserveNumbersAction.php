@@ -4,6 +4,7 @@ namespace App\Actions\Purchases;
 
 use App\Models\ConversationState;
 use App\Models\Customer;
+use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Purchase;
 use App\Models\PurchaseNumber;
@@ -58,6 +59,57 @@ class ReserveNumbersAction
         }
 
         return DB::transaction(function () use ($customer, $raffle, $requestedNumbers, $quantity, $selectionMode, $metadata): Purchase {
+            $previousState = ConversationState::query()
+                ->where('customer_id', $customer->id)
+                ->where('channel', 'whatsapp')
+                ->with(['reservation:id,status,customer_id,purchase_id', 'purchase:id,status,reservation_id,customer_id'])
+                ->first();
+
+            $prevReservation = $previousState?->reservation;
+            $prevPurchase = $previousState?->purchase;
+
+            if ($prevReservation !== null && $prevReservation->customer_id === $customer->id && $prevReservation->status === 'active') {
+                $prevReservation->forceFill([
+                    'status' => 'cancelled',
+                    'cancelled_at' => now(),
+                ])->save();
+            }
+
+            if ($prevPurchase !== null
+                && $prevPurchase->customer_id === $customer->id
+                && in_array($prevPurchase->status, ['reserved', 'rejected'], true)
+            ) {
+                $releasedPrev = 0;
+                foreach ($prevPurchase->numbers as $prevNumber) {
+                    if ($prevNumber->raffleNumber?->status === 'reserved') {
+                        $prevNumber->raffleNumber->forceFill([
+                            'status' => 'available',
+                            'reserved_until' => null,
+                        ])->save();
+                        $releasedPrev++;
+                    }
+                }
+                PurchaseNumber::query()->where('purchase_id', $prevPurchase->id)->delete();
+                $prevPurchase->forceFill([
+                    'status' => 'cancelled',
+                    'cancelled_at' => now(),
+                    'reserved_until' => null,
+                    'metadata_json' => array_merge($prevPurchase->metadata_json ?? [], [
+                        'replaced_by_new_reservation_at' => now()->toIso8601String(),
+                        'released_numbers_count' => $releasedPrev,
+                    ]),
+                ])->save();
+
+                Payment::query()
+                    ->where('purchase_id', $prevPurchase->id)
+                    ->where('status', 'pending_review')
+                    ->update([
+                        'status' => 'customer_cancelled',
+                        'reviewed_at' => now(),
+                        'review_due_at' => null,
+                    ]);
+            }
+
             $numbers = RaffleNumber::query()
                 ->where('raffle_id', $raffle->id)
                 ->whereIn('number', $requestedNumbers)

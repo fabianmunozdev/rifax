@@ -3,24 +3,26 @@
 namespace App\Actions\Purchases;
 
 use App\Models\ConversationState;
+use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 
 class CancelPurchaseFlowAction
 {
     /**
-     * @return array{cancelled: bool, released_numbers: int}
+     * @return array{cancelled: bool, released_numbers: int, cancelled_payments: int}
      */
     public function execute(ConversationState $state): array
     {
         return DB::transaction(function () use ($state): array {
             /** @var ConversationState $lockedState */
             $lockedState = ConversationState::query()
-                ->with(['reservation.purchase.numbers.raffleNumber', 'purchase.numbers.raffleNumber'])
+                ->with(['reservation.purchase.numbers.raffleNumber', 'purchase.numbers.raffleNumber', 'purchase.payments'])
                 ->lockForUpdate()
                 ->findOrFail($state->id);
 
             $releasedNumbers = 0;
             $cancelled = false;
+            $cancelledPayments = 0;
 
             $reservation = $lockedState->reservation;
             $purchase = $lockedState->purchase ?: $reservation?->purchase;
@@ -34,22 +36,39 @@ class CancelPurchaseFlowAction
                 $cancelled = true;
             }
 
-            if ($purchase !== null && in_array($purchase->status, ['reserved', 'rejected'], true)) {
+            $purchaseStatusCancellable = $purchase !== null
+                && in_array($purchase->status, ['reserved', 'rejected', 'payment_submitted'], true);
+
+            if ($purchaseStatusCancellable) {
+                $oldStatus = $purchase->status;
                 $purchase->forceFill([
                     'status' => 'cancelled',
                     'cancelled_at' => now(),
                     'reserved_until' => null,
                 ])->save();
 
-                foreach ($purchase->numbers as $purchaseNumber) {
-                    if ($purchaseNumber->raffleNumber?->status === 'reserved') {
-                        $purchaseNumber->raffleNumber->forceFill([
-                            'status' => 'available',
-                            'reserved_until' => null,
-                        ])->save();
+                if (in_array($oldStatus, ['reserved', 'rejected', 'payment_submitted'], true)) {
+                    foreach ($purchase->numbers as $purchaseNumber) {
+                        if ($purchaseNumber->raffleNumber?->status === 'reserved') {
+                            $purchaseNumber->raffleNumber->forceFill([
+                                'status' => 'available',
+                                'reserved_until' => null,
+                            ])->save();
 
-                        $releasedNumbers++;
+                            $releasedNumbers++;
+                        }
                     }
+                }
+
+                if ($oldStatus === 'payment_submitted') {
+                    $cancelledPayments = (int) Payment::query()
+                        ->where('purchase_id', $purchase->id)
+                        ->where('status', 'pending_review')
+                        ->update([
+                            'status' => 'customer_cancelled',
+                            'reviewed_at' => now(),
+                            'review_due_at' => null,
+                        ]);
                 }
 
                 $cancelled = true;
@@ -67,12 +86,15 @@ class CancelPurchaseFlowAction
                 'metadata_json' => array_merge($lockedState->metadata_json ?? [], [
                     'cancelled_at' => now()->toIso8601String(),
                     'released_numbers' => $releasedNumbers,
+                    'cancelled_payments' => $cancelledPayments,
+                    'previous_purchase_status' => $purchase?->status ?? null,
                 ]),
             ])->save();
 
             return [
                 'cancelled' => $cancelled,
                 'released_numbers' => $releasedNumbers,
+                'cancelled_payments' => $cancelledPayments,
             ];
         });
     }

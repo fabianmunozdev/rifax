@@ -194,27 +194,28 @@ class ProcessIncomingWhatsappMessageAction
     {
         $rawText = trim((string) ($inboundMessage->body_text ?? ''));
         $text = trim(Str::upper($rawText));
+        $normText = $this->normalizeKeywordText($text);
 
-        if ($inboundMessage->message_type === 'image' && ! in_array($state->status, ['purchase_payment_instructions', 'purchase_rejected'], true)) {
-            return 'Recibimos una imagen, pero ahora mismo no estamos esperando un comprobante de pago.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
-        }
-
-        if ($this->isFaqShortcut($text)) {
-            return $this->handleFaqShortcut($state, $text);
-        }
-
-        if ($text === 'MENU') {
+        if ($this->isMenuCommand($normText)) {
             $this->resetToMainMenu($state);
 
             return $this->renderMainMenu();
         }
 
-        if ($text === 'CANCELAR') {
+        if ($this->isCancelCommand($normText)) {
             $result = $this->cancelPurchaseFlowAction->execute($state);
 
             return $result['cancelled']
                 ? 'Proceso cancelado y reserva liberada correctamente.'.PHP_EOL.PHP_EOL.$this->renderMainMenu()
                 : 'Proceso cancelado.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+        }
+
+        if ($inboundMessage->message_type === 'image' && ! in_array($state->status, ['purchase_payment_instructions', 'purchase_rejected', 'purchase_under_review'], true)) {
+            return 'Recibimos una imagen, pero ahora mismo no estamos esperando un comprobante de pago.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+        }
+
+        if ($this->isFaqShortcut($normText)) {
+            return $this->handleFaqShortcut($state, $text);
         }
 
         if (($pickerToken = $this->extractPickerIntentToken($text)) !== null) {
@@ -225,8 +226,8 @@ class ProcessIncomingWhatsappMessageAction
             return $this->recoverCompletedOnboarding($customer, $state, $text);
         }
 
-        if ($this->shouldReenterClosedPurchaseFlow($state, $text)) {
-            return $this->handleClosedPurchaseReentry($state, $text);
+        if ($this->shouldReenterClosedPurchaseFlow($state, $normText)) {
+            return $this->handleClosedPurchaseReentry($state, $normText);
         }
 
         return match ($state->status) {
@@ -235,8 +236,8 @@ class ProcessIncomingWhatsappMessageAction
             'purchase_enter_quantity' => $this->handlePurchaseEnterQuantity($state, $text),
             'purchase_choose_mode' => $this->handlePurchaseChooseMode($customer, $state, $text),
             'purchase_select_numbers' => $this->handlePurchaseSelectNumbers($customer, $state, $text),
-            'purchase_payment_instructions', 'purchase_rejected' => $this->handlePaymentProofStep($state, $inboundMessage),
-            'purchase_under_review' => 'Tu compra sigue en revisión. Te avisaremos por este medio cuando tengamos una respuesta.',
+            'purchase_payment_instructions', 'purchase_rejected' => $this->handlePaymentProofStep($customer, $state, $inboundMessage),
+            'purchase_under_review' => $this->handlePurchaseUnderReview($customer, $state, $inboundMessage, $normText),
             'purchase_paid' => 'Tu compra ya fue aprobada. Muy pronto podrás consultar tu boleto desde este chat.',
             'purchase_expired' => $this->handleExpiredState($customer, $state, $text),
             'onboarding_privacy_consent' => $this->handleOnboardingPrivacyConsent($customer, $state, $text),
@@ -451,21 +452,45 @@ class ProcessIncomingWhatsappMessageAction
         return $this->renderReservationConfirmation($purchase);
     }
 
-    protected function handlePaymentProofStep(ConversationState $state, WhatsappMessage $inboundMessage): string
+    protected function handlePaymentProofStep(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage): string
     {
         $purchase = $state->purchase;
 
+        if ($purchase === null) {
+            $purchase = Purchase::query()
+                ->where('customer_id', $customer->id)
+                ->whereIn('status', ['reserved', 'rejected'])
+                ->latest('id')
+                ->first();
+        }
+
         if ($inboundMessage->message_type !== 'image') {
+            if ($purchase !== null && $purchase->status === 'expired') {
+                $state->forceFill([
+                    'status' => 'purchase_expired',
+                    'context_expires_at' => now(),
+                ])->save();
+
+                return $this->handleExpiredState($customer, $state, '');
+            }
+
             if ($state->status === 'purchase_rejected') {
-                return 'Tu pago fue rechazado. Envía un nuevo comprobante por imagen para continuar.'.PHP_EOL.PHP_EOL
-                    .$this->renderPaymentWaitingReminder($purchase);
+                $reminder = $purchase !== null
+                    ? $this->renderPaymentWaitingReminder($purchase)
+                    : 'Envía un nuevo comprobante por imagen para continuar.';
+
+                return 'Tu pago fue rechazado. Envía un nuevo comprobante por imagen para continuar.'.PHP_EOL.PHP_EOL.$reminder;
+            }
+
+            if ($purchase === null) {
+                return 'No encontramos una compra activa. Si deseas iniciar una nueva, escribe COMPRAR o MENU.';
             }
 
             return $this->renderPaymentWaitingReminder($purchase);
         }
 
         if ($purchase === null) {
-            return 'No encontramos una compra activa para asociar este comprobante.';
+            return 'No encontramos una compra activa para asociar este comprobante. Si lo deseas, escribe COMPRAR para iniciar una nueva o MENU para volver al inicio.';
         }
 
         try {
@@ -475,12 +500,85 @@ class ProcessIncomingWhatsappMessageAction
                 storagePath: 'whatsapp-proofs/'.$inboundMessage->id.'.jpg',
                 originalFilename: 'whatsapp-proof-'.$inboundMessage->id.'.jpg',
                 mimeType: 'image/jpeg',
+                metadata: ['replace_previous' => false],
             );
-        } catch (InvalidArgumentException) {
-            return 'No fue posible registrar el comprobante para la compra actual.';
+        } catch (InvalidArgumentException $e) {
+            $message = match (true) {
+                str_contains($e->getMessage(), 'already submitted') => 'Ya tienes un comprobante en revisión. Si deseas reemplazarlo, escribe REEMPLAZAR y luego envía la nueva imagen.',
+                default => 'No fue posible registrar el comprobante para la compra actual: '.$e->getMessage(),
+            };
+
+            return $message;
         }
 
-        return 'Hemos recibido tu comprobante y tu compra está en revisión.'.PHP_EOL.PHP_EOL.'Te avisaremos por este medio cuando el pago sea aprobado o rechazado.';
+        return 'Hemos recibido tu comprobante y tu compra está en revisión.'.PHP_EOL.PHP_EOL.'Te avisaremos por este medio cuando el pago sea aprobado o rechazado.'.PHP_EOL.PHP_EOL.'Si necesitas reemplazar el comprobante antes de la revisión, escribe REEMPLAZAR y envía la nueva imagen.';
+    }
+
+    protected function handlePurchaseUnderReview(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage, string $normText): string
+    {
+        $purchase = $state->purchase;
+
+        if ($purchase === null) {
+            $purchase = Purchase::query()
+                ->where('customer_id', $customer->id)
+                ->latest('id')
+                ->first();
+        }
+
+        if ($purchase === null || ! in_array($purchase->status, ['payment_submitted'], true)) {
+            $this->resetToMainMenu($state);
+
+            return 'Tu compra ya no está en revisión. Regresamos al menú principal.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+        }
+
+        $pendingPayment = $purchase->payments()
+            ->where('status', 'pending_review')
+            ->latest('id')
+            ->first();
+
+        if ($this->isReplaceCommand($normText) || $inboundMessage->message_type === 'image') {
+            if ($pendingPayment !== null && $inboundMessage->message_type === 'image') {
+                try {
+                    $this->submitPaymentProofAction->execute(
+                        purchase: $purchase,
+                        whatsappMessage: $inboundMessage,
+                        storagePath: 'whatsapp-proofs/'.$inboundMessage->id.'.jpg',
+                        originalFilename: 'whatsapp-proof-'.$inboundMessage->id.'.jpg',
+                        mimeType: 'image/jpeg',
+                        metadata: ['replace_previous_payment_id' => $pendingPayment->id, 'replace_previous' => true],
+                    );
+                } catch (InvalidArgumentException $e) {
+                    return 'No fue posible reemplazar el comprobante: '.$e->getMessage().PHP_EOL.PHP_EOL
+                        .'Recuerda que también puedes escribir MENU para ver las opciones disponibles.';
+                }
+
+                return 'Hemos reemplazado tu comprobante y la compra sigue en revisión. Te avisaremos cuando tengamos una respuesta.';
+            }
+
+            if ($this->isReplaceCommand($normText)) {
+                $state->forceFill([
+                    'metadata_json' => array_merge($state->metadata_json ?? [], [
+                        'awaiting_replacement_proof' => true,
+                        'replacement_for_payment_id' => $pendingPayment?->id,
+                    ]),
+                ])->save();
+
+                return 'Listo. Envía la nueva imagen del comprobante en el siguiente mensaje para reemplazar el comprobante actual.';
+            }
+
+            if ($inboundMessage->message_type === 'image') {
+                return 'Recibimos una imagen. Para reemplazar tu comprobante actual primero escribe REEMPLAZAR y luego envía la nueva imagen.';
+            }
+        }
+
+        $info = 'Tu compra sigue en revisión. Te avisaremos por este medio cuando tengamos una respuesta.'.PHP_EOL.PHP_EOL;
+        if ($pendingPayment !== null) {
+            $info .= 'Si necesitas reemplazar el comprobante antes de nuestra revisión, escribe REEMPLAZAR y luego envía la nueva imagen.';
+        } else {
+            $info .= 'Próximamente recibirás nuestra respuesta.';
+        }
+
+        return $info;
     }
 
     protected function handlePickerIntent(Customer $customer, ConversationState $state, string $token): string
@@ -1364,47 +1462,114 @@ class ProcessIncomingWhatsappMessageAction
         ];
     }
 
-    protected function isFaqShortcut(string $text): bool
+    protected function normalizeKeywordText(string $text): string
     {
-        return in_array($text, ['AYUDA', 'CONDICIONES', 'PAGOS', 'METODOS DE PAGO', 'MÉTODOS DE PAGO', 'SORTEO'], true);
+        $normalized = Str::upper(trim($text));
+
+        if (function_exists('normalizer_normalize')) {
+            $decomposed = normalizer_normalize($normalized, \Normalizer::FORM_D);
+            if ($decomposed !== false) {
+                $normalized = (string) preg_replace('/\p{Mn}/u', '', $decomposed);
+            }
+        }
+
+        $withoutPunct = (string) preg_replace('/[^A-Z0-9Ñ\s]+/u', ' ', $normalized);
+        $withoutPunct = (string) preg_replace('/\s+/u', ' ', $withoutPunct);
+
+        return trim($withoutPunct);
     }
 
-    protected function isGreeting(string $text): bool
+    /**
+     * @param  list<string>  $keywords
+     */
+    protected function containsAnyKeyword(string $normText, array $keywords): bool
     {
-        return in_array($text, [
-            'HOLA',
-            'HOLA!',
-            'BUENAS',
-            'BUEN DIA',
-            'BUEN DÍA',
-            'BUENOS DIAS',
-            'BUENOS DÍAS',
-            'BUENAS TARDES',
-            'BUENAS NOCHES',
-        ], true);
+        if ($normText === '') {
+            return false;
+        }
+
+        foreach ($keywords as $keyword) {
+            if ($keyword === '') {
+                continue;
+            }
+
+            if (str_contains($normText, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    protected function isRepurchaseShortcut(string $text): bool
+    protected function isMenuCommand(string $normText): bool
     {
-        return in_array($text, [
-            '1',
-            'COMPRAR',
-            'QUIERO COMPRAR',
-            'COMPRAR DE NUEVO',
-            'VOLVER A COMPRAR',
-            'NUEVA COMPRA',
-            'OTRA VEZ',
-            'OTRA',
-        ], true);
+        return $normText === 'MENU'
+            || $this->containsAnyKeyword($normText, ['MENU', 'VOLVER AL MENU', 'INICIO', 'REGRESAR AL INICIO']);
+    }
+
+    protected function isCancelCommand(string $normText): bool
+    {
+        return $normText === 'CANCELAR'
+            || $this->containsAnyKeyword($normText, [
+                'CANCELAR', 'CANCELA', 'CANCELO', 'ANULAR', 'ANULA', 'ANULO',
+                'CANCELAR COMPRA', 'ANULAR COMPRA', 'CANCELAR RESERVA', 'LIBERAR NUMEROS',
+            ]);
+    }
+
+    protected function isReplaceCommand(string $normText): bool
+    {
+        return $normText === 'REEMPLAZAR'
+            || $this->containsAnyKeyword($normText, [
+                'REEMPLAZAR', 'REEMPLAZA', 'REEMPLAZO', 'CAMBIAR COMPROBANTE', 'CAMBIO COMPROBANTE',
+                'NUEVO COMPROBANTE', 'OTRO COMPROBANTE', 'CORREGIR COMPROBANTE',
+            ]);
+    }
+
+    protected function isFaqShortcut(string $normText): bool
+    {
+        if ($normText === '') {
+            return false;
+        }
+
+        return $this->containsAnyKeyword($normText, ['AYUDA', 'CONDICIONES', 'PAGOS', 'METODOS DE PAGO', 'SORTEO']);
+    }
+
+    protected function isGreeting(string $normText): bool
+    {
+        if ($normText === '') {
+            return false;
+        }
+
+        return $this->containsAnyKeyword($normText, [
+            'HOLA', 'BUENAS', 'BUEN DIA', 'BUENOS DIAS', 'BUENAS TARDES', 'BUENAS NOCHES', 'HELLO', 'QUE TAL',
+        ]);
+    }
+
+    protected function isRepurchaseShortcut(string $normText): bool
+    {
+        if ($normText === '') {
+            return false;
+        }
+
+        if ($normText === '1') {
+            return true;
+        }
+
+        return $this->containsAnyKeyword($normText, [
+            'COMPRAR', 'QUIERO COMPRAR', 'COMPRAR DE NUEVO', 'VOLVER A COMPRAR',
+            'NUEVA COMPRA', 'OTRA VEZ', 'OTRA COMPRA', 'PARTICIPAR DE NUEVO', 'QUIERO OTRO',
+        ]);
     }
 
     protected function handleFaqShortcut(ConversationState $state, string $text): string
     {
-        return match ($text) {
-            'AYUDA' => $this->renderHelp(),
-            'CONDICIONES' => $this->renderConditions(),
-            'PAGOS', 'METODOS DE PAGO', 'MÉTODOS DE PAGO' => $this->renderPaymentMethods(),
-            'SORTEO' => $this->renderDrawDate($state),
+        $norm = $this->normalizeKeywordText($text);
+
+        return match (true) {
+            $this->containsAnyKeyword($norm, ['AYUDA']) => $this->renderHelp(),
+            $this->containsAnyKeyword($norm, ['CONDICIONES']) => $this->renderConditions(),
+            $this->containsAnyKeyword($norm, ['PAGOS', 'METODOS DE PAGO']) => $this->renderPaymentMethods(),
+            $this->containsAnyKeyword($norm, ['SORTEO']) => $this->renderDrawDate($state),
             default => $this->renderMainMenu(),
         };
     }
