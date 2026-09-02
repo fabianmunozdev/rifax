@@ -4,6 +4,7 @@ namespace App\Actions\Tickets;
 
 use App\Models\Purchase;
 use App\Models\Ticket;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -40,7 +41,29 @@ class GenerateTicketForPurchaseAction
             ])->save();
         }
 
-        if (blank($ticket->image_path) || blank($ticket->thumbnail_path)) {
+        $needRender = blank($ticket->image_path) || blank($ticket->thumbnail_path);
+
+        if (! $needRender) {
+            $disk = Storage::disk('public');
+            $imgExists = $disk->exists((string) $ticket->image_path);
+            $thumbExists = $disk->exists((string) $ticket->thumbnail_path);
+            $imgIsEmpty = false;
+            $thumbIsEmpty = false;
+            try {
+                if ($imgExists) {
+                    $imgIsEmpty = $disk->size((string) $ticket->image_path) < 256;
+                }
+                if ($thumbExists) {
+                    $thumbIsEmpty = $disk->size((string) $ticket->thumbnail_path) < 256;
+                }
+            } catch (\Throwable) {
+                $imgIsEmpty = ! $imgExists;
+                $thumbIsEmpty = ! $thumbExists;
+            }
+            $needRender = ! $imgExists || ! $thumbExists || $imgIsEmpty || $thumbIsEmpty;
+        }
+
+        if ($needRender) {
             $ticket = $this->renderTicketAssetsAction->execute($ticket);
         }
 

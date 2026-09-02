@@ -23,7 +23,9 @@ class QueueTicketDocumentTest extends TestCase
 
     public function test_it_queues_the_ticket_document_when_the_conversation_is_inside_the_24h_window(): void
     {
-        Queue::fake();
+        Queue::fake([
+            DispatchWhatsappMessageJob::class,
+        ]);
         Storage::fake('public');
 
         config()->set('services.whatsapp.send_enabled', true);

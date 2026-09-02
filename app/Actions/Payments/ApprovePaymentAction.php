@@ -3,9 +3,7 @@
 namespace App\Actions\Payments;
 
 use App\Actions\Admin\RecordAdminAuditAction;
-use App\Actions\Tickets\GenerateTicketForPurchaseAction;
-use App\Actions\WhatsApp\SendPurchasePaidWhatsappNotificationAction;
-use App\Actions\WhatsApp\SendTicketDocumentWhatsappAction;
+use App\Jobs\PostPaymentApprovedJob;
 use App\Models\ConversationState;
 use App\Models\Payment;
 use App\Models\User;
@@ -16,9 +14,6 @@ use InvalidArgumentException;
 class ApprovePaymentAction
 {
     public function __construct(
-        protected GenerateTicketForPurchaseAction $generateTicketForPurchaseAction,
-        protected SendPurchasePaidWhatsappNotificationAction $sendPurchasePaidWhatsappNotificationAction,
-        protected SendTicketDocumentWhatsappAction $sendTicketDocumentWhatsappAction,
         protected RecordAdminAuditAction $recordAdminAuditAction,
     ) {
     }
@@ -32,8 +27,24 @@ class ApprovePaymentAction
                 ->lockForUpdate()
                 ->findOrFail($payment->id);
 
+            if ($lockedPayment->status === 'approved') {
+                Log::info('ApprovePaymentAction: Payment already approved, skipping DB updates but re-dispatching post-approval notifications.', [
+                    'payment_id' => $lockedPayment->id,
+                    'purchase_id' => $lockedPayment->purchase_id,
+                    'reviewed_at' => $lockedPayment->reviewed_at,
+                ]);
+
+                DB::afterCommit(function () use ($lockedPayment): void {
+                    if ($lockedPayment->purchase_id !== null) {
+                        PostPaymentApprovedJob::dispatch($lockedPayment->purchase_id);
+                    }
+                });
+
+                return $lockedPayment->fresh(['purchase.numbers.raffleNumber']) ?? $lockedPayment;
+            }
+
             if ($lockedPayment->status !== 'pending_review') {
-                throw new InvalidArgumentException('Only pending review payments can be approved.');
+                throw new InvalidArgumentException('Only pending review payments can be approved. Current status: '.$lockedPayment->status);
             }
 
             $before = $this->recordAdminAuditAction->snapshot($lockedPayment);
@@ -111,51 +122,7 @@ class ApprovePaymentAction
             );
 
             DB::afterCommit(function () use ($purchase): void {
-                $freshPurchase = $purchase->fresh(['customer', 'raffle', 'ticket']) ?? $purchase;
-
-                try {
-                    $this->generateTicketForPurchaseAction->execute($freshPurchase);
-                } catch (\Throwable $e) {
-                    Log::error('ApprovePaymentAction: GenerateTicketForPurchaseAction failed after commit.', [
-                        'purchase_id' => $freshPurchase->id,
-                        'payment_id' => $purchase->id,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                }
-
-                $purchaseWithTicket = $freshPurchase->fresh(['customer', 'raffle', 'ticket', 'numbers', 'conversationStates']) ?? $freshPurchase;
-
-                try {
-                    $this->sendPurchasePaidWhatsappNotificationAction->execute($purchaseWithTicket);
-                } catch (\Throwable $e) {
-                    Log::error('ApprovePaymentAction: SendPurchasePaidWhatsappNotificationAction failed.', [
-                        'purchase_id' => $purchaseWithTicket->id,
-                        'ticket_id' => $purchaseWithTicket->ticket?->id,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                }
-
-                try {
-                    $docSent = $this->sendTicketDocumentWhatsappAction->execute($purchaseWithTicket);
-                    if (! $docSent) {
-                        Log::warning('ApprovePaymentAction: Ticket document WhatsApp not dispatched (see prior SendTicketDocumentWhatsappAction warnings). Purchase still received the payment-approved notification.', [
-                            'purchase_id' => $purchaseWithTicket->id,
-                            'ticket_id' => $purchaseWithTicket->ticket?->id,
-                            'ticket_code' => $purchaseWithTicket->ticket?->code,
-                            'ticket_image_path' => $purchaseWithTicket->ticket?->image_path,
-                            'public_url' => $purchaseWithTicket->ticket?->public_url,
-                        ]);
-                    }
-                } catch (\Throwable $e) {
-                    Log::error('ApprovePaymentAction: SendTicketDocumentWhatsappAction failed.', [
-                        'purchase_id' => $purchaseWithTicket->id,
-                        'ticket_id' => $purchaseWithTicket->ticket?->id,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                }
+                PostPaymentApprovedJob::dispatch($purchase->id);
             });
 
             return $lockedPayment->fresh(['purchase.numbers.raffleNumber']);

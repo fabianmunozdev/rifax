@@ -26,7 +26,25 @@ class RenderTicketAssetsAction
         $raffle = $purchase?->raffle;
         $customer = $purchase?->customer;
         $numbers = $purchase?->numbers
-            ?->pluck('number')
+            ?->map(function (mixed $purchaseNumber): ?string {
+                $value = null;
+                if (is_object($purchaseNumber)) {
+                    if (isset($purchaseNumber->number) && filled($purchaseNumber->number)) {
+                        $value = (string) $purchaseNumber->number;
+                    } elseif (isset($purchaseNumber->value) && filled($purchaseNumber->value)) {
+                        $value = (string) $purchaseNumber->value;
+                    } elseif (method_exists($purchaseNumber, 'getAttribute')) {
+                        $num = $purchaseNumber->getAttribute('number') ?? $purchaseNumber->getAttribute('value') ?? null;
+                        if (filled($num)) {
+                            $value = (string) $num;
+                        }
+                    }
+                } elseif (is_scalar($purchaseNumber) && filled($purchaseNumber)) {
+                    $value = (string) $purchaseNumber;
+                }
+
+                return filled($value) ? $value : null;
+            })
             ?->filter()
             ?->values() ?? new Collection();
 
