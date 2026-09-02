@@ -116,6 +116,16 @@ class DispatchOutboundWhatsappMessageAction
             ];
         }
 
+        if ($message->message_type === 'interactive') {
+            return [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $waId,
+                'type' => 'interactive',
+                'interactive' => Arr::get($message->payload_json, 'interactive', []),
+            ];
+        }
+
         return [
             'messaging_product' => 'whatsapp',
             'recipient_type' => 'individual',

@@ -4,6 +4,7 @@ namespace App\Actions\WhatsApp;
 
 use App\Models\ContentEntry;
 use App\Models\Purchase;
+use App\Support\WhatsAppReply;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
@@ -82,6 +83,28 @@ class SendPurchasePaidWhatsappNotificationAction
                 messageType: 'template',
                 bodyText: $bodyText,
                 payloadJson: $payloadJson,
+            );
+
+            return;
+        }
+
+        $buttons = [];
+        if (filled($variables['ticket_url'] ?? null)) {
+            $buttons[] = ['id' => 'view_ticket:'.($purchase->ticket?->token ?? 'paid'), 'title' => 'Ver boleto'];
+        }
+        $buttons[] = ['id' => 'paid_menu', 'title' => 'Menú'];
+
+        if ($buttons !== []) {
+            $reply = WhatsAppReply::make($bodyText, $buttons);
+            $this->queueOutboundWhatsappMessageAction->execute(
+                customer: $purchase->customer,
+                messageType: 'interactive',
+                bodyText: $bodyText,
+                payloadJson: [
+                    'interactive' => $reply->toInteractiveMetaPayload(),
+                    'interactive_buttons' => $reply->buttons,
+                    'ticket_id' => $purchase->ticket?->id,
+                ],
             );
 
             return;

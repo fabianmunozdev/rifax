@@ -14,6 +14,7 @@ use App\Models\Purchase;
 use App\Models\Raffle;
 use App\Models\RafflePickerIntent;
 use App\Models\WhatsappMessage;
+use App\Support\WhatsAppReply;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -66,15 +67,32 @@ class ProcessIncomingWhatsappMessageAction
 
         $reply = $this->resolveReply($customer, $conversationState->fresh(), $inboundMessage);
 
-        $outboundMessage = WhatsappMessage::query()->create([
-            'customer_id' => $customer->id,
-            'direction' => 'outbound',
-            'message_type' => 'text',
-            'body_text' => $reply,
-            'payload_json' => ['text' => ['body' => $reply]],
-            'status' => 'generated',
-            'provider_created_at' => now(),
-        ]);
+        if ($reply instanceof WhatsAppReply && $reply->hasButtons()) {
+            $outboundMessage = WhatsappMessage::query()->create([
+                'customer_id' => $customer->id,
+                'direction' => 'outbound',
+                'message_type' => 'interactive',
+                'body_text' => $reply->body,
+                'payload_json' => [
+                    'interactive' => $reply->toInteractiveMetaPayload(),
+                    'interactive_buttons' => $reply->buttons,
+                ],
+                'status' => 'generated',
+                'provider_created_at' => now(),
+            ]);
+        } else {
+            $bodyText = $reply instanceof WhatsAppReply ? $reply->body : (string) $reply;
+
+            $outboundMessage = WhatsappMessage::query()->create([
+                'customer_id' => $customer->id,
+                'direction' => 'outbound',
+                'message_type' => 'text',
+                'body_text' => $bodyText,
+                'payload_json' => ['text' => ['body' => $bodyText]],
+                'status' => 'generated',
+                'provider_created_at' => now(),
+            ]);
+        }
 
         $outboundMessage = $this->dispatchOutboundWhatsappMessageAction->execute($customer, $outboundMessage);
 
@@ -179,18 +197,124 @@ class ProcessIncomingWhatsappMessageAction
     {
         $type = (string) Arr::get($message, 'type', 'other');
 
+        $bodyText = match ($type) {
+            'text' => Arr::get($message, 'text.body'),
+            'image' => Arr::get($message, 'image.caption'),
+            'interactive' => $this->normalizeInteractiveBody($message),
+            'button' => $this->normalizeButtonBody($message),
+            default => null,
+        };
+
         return [
             'type' => $type,
-            'body_text' => match ($type) {
-                'text' => Arr::get($message, 'text.body'),
-                'image' => Arr::get($message, 'image.caption'),
-                default => null,
-            },
+            'body_text' => $bodyText,
             'provider_message_id' => Arr::get($message, 'id'),
         ];
     }
 
-    protected function resolveReply(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage): string
+    /**
+     * @param  array<mixed>  $message
+     */
+    protected function normalizeInteractiveBody(array $message): ?string
+    {
+        $interactiveType = (string) Arr::get($message, 'interactive.type', '');
+
+        $payload = match ($interactiveType) {
+            'button_reply' => (string) Arr::get($message, 'interactive.button_reply.id'),
+            'list_reply' => (string) Arr::get($message, 'interactive.list_reply.id'),
+            default => '',
+        };
+
+        if ($payload === '') {
+            return null;
+        }
+
+        return $this->expandButtonPayloadToText($payload);
+    }
+
+    /**
+     * @param  array<mixed>  $message
+     */
+    protected function normalizeButtonBody(array $message): ?string
+    {
+        $payload = (string) Arr::get($message, 'button.payload');
+        $text = (string) Arr::get($message, 'button.text');
+
+        if ($payload !== '') {
+            return $this->expandButtonPayloadToText($payload);
+        }
+
+        return $text !== '' ? $text : null;
+    }
+
+    protected function expandButtonPayloadToText(string $payload): string
+    {
+        $payload = trim($payload);
+
+        if ($payload === '') {
+            return '';
+        }
+
+        $alias = [
+            'main_menu' => 'MENU',
+            'cancel_purchase' => 'CANCELAR',
+            'buy_now' => '1',
+            'menu_1' => '1',
+            'menu_2' => '2',
+            'menu_3' => '3',
+            'menu_4' => '4',
+            'menu_5' => '5',
+            'menu_6' => '6',
+            'menu_7' => '7',
+            'replace_proof' => 'REEMPLAZAR',
+            'expired_new_purchase' => '1',
+            'expired_menu' => 'MENU',
+            'raffle_continue' => '1',
+            'raffle_back' => 'MENU',
+            'payment_menu' => 'MENU',
+            'payment_help' => '7',
+            'under_review_replace' => 'REEMPLAZAR',
+            'under_review_menu' => 'MENU',
+            'privacy_accept' => 'ACEPTO',
+            'privacy_reject' => 'NO ACEPTO',
+            'mode_manual' => '1',
+            'mode_random' => '2',
+        ];
+
+        if (isset($alias[$payload])) {
+            return $alias[$payload];
+        }
+
+        if (Str::startsWith($payload, 'paid_menu')) {
+            return 'MENU';
+        }
+
+        if (Str::startsWith($payload, 'menu_')) {
+            $digit = substr($payload, 5);
+            if (ctype_digit($digit)) {
+                return $digit;
+            }
+        }
+
+        if (Str::startsWith($payload, 'raffle_')) {
+            $rest = substr($payload, 7);
+            if (ctype_digit($rest)) {
+                return $rest;
+            }
+        }
+
+        if (Str::startsWith($payload, 'view_ticket:')) {
+            return 'MENU';
+        }
+
+        if (Str::startsWith($payload, 'ticket_web:')) {
+            return '3';
+        }
+
+        return $payload;
+    }
+
+    protected function resolveReply(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage): WhatsAppReply|string
     {
         $rawText = trim((string) ($inboundMessage->body_text ?? ''));
         $text = trim(Str::upper($rawText));
@@ -571,14 +695,20 @@ class ProcessIncomingWhatsappMessageAction
             }
         }
 
-        $info = 'Tu compra sigue en revisión. Te avisaremos por este medio cuando tengamos una respuesta.'.PHP_EOL.PHP_EOL;
+        $info = 'Tu compra sigue en revisión. Te avisaremos por este medio cuando tengamos una respuesta.';
+        $buttons = [];
+
         if ($pendingPayment !== null) {
-            $info .= 'Si necesitas reemplazar el comprobante antes de nuestra revisión, escribe REEMPLAZAR y luego envía la nueva imagen.';
+            $info .= PHP_EOL.PHP_EOL
+                .'Si necesitas reemplazar el comprobante antes de nuestra revisión, escribe REEMPLAZAR y luego envía la nueva imagen.';
+            $buttons[] = ['id' => 'under_review_replace', 'title' => 'Reemplazar'];
         } else {
-            $info .= 'Próximamente recibirás nuestra respuesta.';
+            $info .= PHP_EOL.PHP_EOL.'Próximamente recibirás nuestra respuesta.';
         }
 
-        return $info;
+        $buttons[] = ['id' => 'under_review_menu', 'title' => 'Menú'];
+
+        return WhatsAppReply::make($info, $buttons);
     }
 
     protected function handlePickerIntent(Customer $customer, ConversationState $state, string $token): string
@@ -697,7 +827,7 @@ class ProcessIncomingWhatsappMessageAction
         ])->save();
     }
 
-    protected function handleExpiredState(Customer $customer, ConversationState $state, string $text): string
+    protected function handleExpiredState(Customer $customer, ConversationState $state, string $text): WhatsAppReply|string
     {
         if ($text === '1') {
             if (($onboardingReply = $this->redirectToPurchaseOnboardingIfNeeded($customer, $state, 'purchase_start')) !== null) {
@@ -707,7 +837,7 @@ class ProcessIncomingWhatsappMessageAction
             $raffle = $this->getActiveRaffle();
 
             if ($raffle === null) {
-                return 'Ahora mismo no tenemos una rifa activa disponible.';
+                return 'Ahora mismo no tenemos una rifa activa disponible.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
             }
 
             $state->forceFill([
@@ -718,7 +848,13 @@ class ProcessIncomingWhatsappMessageAction
             return $this->renderRaffleSelection($raffle);
         }
 
-        return 'Tu reserva ya venció. Responde 1 para iniciar una nueva compra o escribe MENU.';
+        $body = 'Tu reserva ya venció. Los números que seleccionaste fueron liberados y pueden ser tomados por otras personas.'.PHP_EOL.PHP_EOL
+            .'Responde 1 para iniciar una nueva compra, o escribe MENU para volver al inicio.';
+
+        return WhatsAppReply::make($body, [
+            ['id' => 'expired_new_purchase', 'title' => 'Comprar de nuevo'],
+            ['id' => 'expired_menu', 'title' => 'Menú'],
+        ]);
     }
 
     protected function redirectToPurchaseOnboardingIfNeeded(Customer $customer, ConversationState $state, string $pendingAction, array $metadata = []): ?string
@@ -899,12 +1035,15 @@ class ProcessIncomingWhatsappMessageAction
             : $this->renderMainMenu();
     }
 
-    protected function renderPrivacyConsentPrompt(): string
+    protected function renderPrivacyConsentPrompt(): WhatsAppReply|string
     {
-        return 'Antes de continuar con tu compra necesitamos tu autorización para el tratamiento de datos personales y la aceptación de las condiciones de compra (nombre y cédula) con el fin de gestionar tu participación.'.PHP_EOL.PHP_EOL
-            .'Responde:'.PHP_EOL
-            .'1. Acepto'.PHP_EOL
-            .'2. No acepto';
+        $body = 'Antes de continuar con tu compra necesitamos tu autorización para el tratamiento de datos personales y la aceptación de las condiciones de compra (nombre y cédula) con el fin de gestionar tu participación.'.PHP_EOL.PHP_EOL
+            .'Responde ACEPTAR o NO ACEPTAR, o usa los botones de abajo.';
+
+        return WhatsAppReply::make($body, [
+            ['id' => 'privacy_accept', 'title' => 'Aceptar'],
+            ['id' => 'privacy_reject', 'title' => 'No acepto'],
+        ]);
     }
 
     protected function renderCollectNamePrompt(): string
@@ -1007,15 +1146,15 @@ class ProcessIncomingWhatsappMessageAction
         ];
     }
 
-    protected function renderMainMenu(): string
+    protected function renderMainMenu(): WhatsAppReply|string
     {
         $welcome = $this->resolvePublishedContentAction->byKey(
             'system.menu.welcome',
             [],
-            'Hola, soy el asistente de Rifax. Responde con la opción que necesitas o escribe MENU para volver aquí.',
+            'Hola, soy el asistente de Rifax. Responde con la opción que necesitas o usa los botones de abajo.',
         );
 
-        return $welcome.PHP_EOL.PHP_EOL
+        $body = $welcome.PHP_EOL.PHP_EOL
             .'Estas son tus opciones:'.PHP_EOL
             .'1. Comprar'.PHP_EOL
             .'2. Números disponibles'.PHP_EOL
@@ -1024,12 +1163,18 @@ class ProcessIncomingWhatsappMessageAction
             .'5. Próximas rifas'.PHP_EOL
             .'6. Condiciones'.PHP_EOL
             .'7. Ayuda'.PHP_EOL.PHP_EOL
-            .'Responde con el número de la opción.';
+            .'Responde con el número de la opción o toca un botón.';
+
+        return WhatsAppReply::make($body, [
+            ['id' => 'menu_1', 'title' => 'Comprar'],
+            ['id' => 'menu_3', 'title' => 'Mis números'],
+            ['id' => 'menu_7', 'title' => 'Ayuda'],
+        ]);
     }
 
-    protected function renderRaffleSelection(Raffle $raffle): string
+    protected function renderRaffleSelection(Raffle $raffle): WhatsAppReply|string
     {
-        return 'Tenemos esta rifa activa:'.PHP_EOL
+        $body = 'Tenemos esta rifa activa:'.PHP_EOL
             ."{$raffle->title}".PHP_EOL.PHP_EOL
             .'Valor por número: '.$this->formatMoneyWithoutDecimals($raffle->price_per_number).PHP_EOL
             .$this->formatLotteryReference($raffle).PHP_EOL
@@ -1037,6 +1182,11 @@ class ProcessIncomingWhatsappMessageAction
             .'Responde:'.PHP_EOL
             .'1. Continuar'.PHP_EOL
             .'2. Volver al menú';
+
+        return WhatsAppReply::make($body, [
+            ['id' => 'raffle_continue', 'title' => 'Continuar'],
+            ['id' => 'raffle_back', 'title' => 'Menú'],
+        ]);
     }
 
     /**
@@ -1067,11 +1217,16 @@ class ProcessIncomingWhatsappMessageAction
             ."Compra mínima para esta rifa: {$raffle->min_numbers_per_purchase}";
     }
 
-    protected function renderChooseMode(): string
+    protected function renderChooseMode(): WhatsAppReply|string
     {
-        return '¿Cómo deseas elegir tus números?'.PHP_EOL
+        $body = '¿Cómo deseas elegir tus números?'.PHP_EOL
             .'1. Elegir manualmente'.PHP_EOL
             .'2. Asignación aleatoria';
+
+        return WhatsAppReply::make($body, [
+            ['id' => 'mode_manual', 'title' => 'Elegir yo'],
+            ['id' => 'mode_random', 'title' => 'Aleatorio'],
+        ]);
     }
 
     protected function renderNumberSelectionPrompt(Raffle $raffle, int $quantity): string
@@ -1099,7 +1254,7 @@ class ProcessIncomingWhatsappMessageAction
             ->implode(',');
     }
 
-    protected function renderReservationConfirmation(Purchase $purchase): string
+    protected function renderReservationConfirmation(Purchase $purchase): WhatsAppReply|string
     {
         $reservedNumbers = $purchase->numbers->pluck('number')->implode(', ');
         $paymentInstructions = $this->renderPaymentInstructionsList($purchase);
@@ -1115,8 +1270,13 @@ class ProcessIncomingWhatsappMessageAction
                 .$paymentInstructions;
         }
 
-        return $message.PHP_EOL.PHP_EOL
+        $body = $message.PHP_EOL.PHP_EOL
             .'Después de pagar, envía una foto clara del comprobante por este chat para continuar.';
+
+        return WhatsAppReply::make($body, [
+            ['id' => 'cancel_purchase', 'title' => 'Cancelar'],
+            ['id' => 'payment_menu', 'title' => 'Menú'],
+        ]);
     }
 
     protected function renderReservationWindowMessage(Purchase $purchase): string
@@ -1138,22 +1298,27 @@ class ProcessIncomingWhatsappMessageAction
         return "Tienes {$minutes} {$minuteLabel} para enviar tu comprobante de pago antes de que los números sean liberados nuevamente.";
     }
 
-    protected function renderPaymentWaitingReminder(?Purchase $purchase): string
+    protected function renderPaymentWaitingReminder(?Purchase $purchase): WhatsAppReply|string
     {
-        if (! $purchase instanceof Purchase) {
-            return 'Envía tu comprobante de pago por imagen en este chat para continuar.';
-        }
+        $body = (! $purchase instanceof Purchase)
+            ? 'Envía tu comprobante de pago por imagen en este chat para continuar.'
+            : (function () use ($purchase): string {
+                $paymentInstructions = $this->renderPaymentInstructionsList($purchase);
+                if ($paymentInstructions === '') {
+                    return 'Envía tu comprobante de pago por imagen en este chat para continuar.';
+                }
 
-        $paymentInstructions = $this->renderPaymentInstructionsList($purchase);
+                return 'Aún estamos esperando tu comprobante de pago.'.PHP_EOL.PHP_EOL
+                    .'Te recuerdo las opciones de pago disponibles para esta compra:'.PHP_EOL.PHP_EOL
+                    .$paymentInstructions.PHP_EOL.PHP_EOL
+                    .'Cuando completes el pago, envía una foto clara del comprobante por este chat.';
+            })();
 
-        if ($paymentInstructions === '') {
-            return 'Envía tu comprobante de pago por imagen en este chat para continuar.';
-        }
-
-        return 'Aún estamos esperando tu comprobante de pago.'.PHP_EOL.PHP_EOL
-            .'Te recuerdo las opciones de pago disponibles para esta compra:'.PHP_EOL.PHP_EOL
-            .$paymentInstructions.PHP_EOL.PHP_EOL
-            .'Cuando completes el pago, envía una foto clara del comprobante por este chat.';
+        return WhatsAppReply::make($body, [
+            ['id' => 'cancel_purchase', 'title' => 'Cancelar'],
+            ['id' => 'payment_help', 'title' => 'Ayuda'],
+            ['id' => 'payment_menu', 'title' => 'Menú'],
+        ]);
     }
 
     protected function renderPaymentInstructionsList(Purchase $purchase): string
