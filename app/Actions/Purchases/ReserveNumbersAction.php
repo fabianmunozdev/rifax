@@ -62,7 +62,7 @@ class ReserveNumbersAction
             $previousState = ConversationState::query()
                 ->where('customer_id', $customer->id)
                 ->where('channel', 'whatsapp')
-                ->with(['reservation:id,status,customer_id,purchase_id', 'purchase:id,status,reservation_id,customer_id'])
+                ->with(['reservation:id,status,customer_id', 'purchase:id,status,reservation_id,customer_id'])
                 ->first();
 
             $prevReservation = $previousState?->reservation;
