@@ -39,7 +39,15 @@ class SendPurchasePaidWhatsappNotificationAction
         ];
 
         $bodyText = $this->renderTemplate($contentEntry?->body_text, $variables)
-            ?: "Hola {$variables['customer_name']}, tu pago para {$variables['raffle_title']} fue aprobado. Tu boleto sera compartido en breve por este medio.";
+            ?: (function () use ($variables): string {
+                $base = "Hola {$variables['customer_name']}, tu pago para {$variables['raffle_title']} fue aprobado. ";
+                if (filled($variables['ticket_url'] ?? null)) {
+                    $base .= "Tu boleto oficial: {$variables['ticket_url']} . ";
+                }
+                $base .= 'Cualquier novedad nos comunicamos por este medio. Gracias por tu participacion.';
+
+                return $base;
+            })();
 
         if ($this->shouldUseTemplateBridge($purchase) && $contentEntry !== null && $contentEntry->type === 'template_bridge') {
             $payloadJson = [

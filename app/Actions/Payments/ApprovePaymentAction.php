@@ -10,6 +10,7 @@ use App\Models\ConversationState;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
 class ApprovePaymentAction
@@ -112,11 +113,49 @@ class ApprovePaymentAction
             DB::afterCommit(function () use ($purchase): void {
                 $freshPurchase = $purchase->fresh(['customer', 'raffle', 'ticket']) ?? $purchase;
 
-                $this->generateTicketForPurchaseAction->execute($freshPurchase);
+                try {
+                    $this->generateTicketForPurchaseAction->execute($freshPurchase);
+                } catch (\Throwable $e) {
+                    Log::error('ApprovePaymentAction: GenerateTicketForPurchaseAction failed after commit.', [
+                        'purchase_id' => $freshPurchase->id,
+                        'payment_id' => $purchase->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                }
+
                 $purchaseWithTicket = $freshPurchase->fresh(['customer', 'raffle', 'ticket', 'numbers', 'conversationStates']) ?? $freshPurchase;
 
-                $this->sendPurchasePaidWhatsappNotificationAction->execute($purchaseWithTicket);
-                $this->sendTicketDocumentWhatsappAction->execute($purchaseWithTicket);
+                try {
+                    $this->sendPurchasePaidWhatsappNotificationAction->execute($purchaseWithTicket);
+                } catch (\Throwable $e) {
+                    Log::error('ApprovePaymentAction: SendPurchasePaidWhatsappNotificationAction failed.', [
+                        'purchase_id' => $purchaseWithTicket->id,
+                        'ticket_id' => $purchaseWithTicket->ticket?->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                }
+
+                try {
+                    $docSent = $this->sendTicketDocumentWhatsappAction->execute($purchaseWithTicket);
+                    if (! $docSent) {
+                        Log::warning('ApprovePaymentAction: Ticket document WhatsApp not dispatched (see prior SendTicketDocumentWhatsappAction warnings). Purchase still received the payment-approved notification.', [
+                            'purchase_id' => $purchaseWithTicket->id,
+                            'ticket_id' => $purchaseWithTicket->ticket?->id,
+                            'ticket_code' => $purchaseWithTicket->ticket?->code,
+                            'ticket_image_path' => $purchaseWithTicket->ticket?->image_path,
+                            'public_url' => $purchaseWithTicket->ticket?->public_url,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('ApprovePaymentAction: SendTicketDocumentWhatsappAction failed.', [
+                        'purchase_id' => $purchaseWithTicket->id,
+                        'ticket_id' => $purchaseWithTicket->ticket?->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                }
             });
 
             return $lockedPayment->fresh(['purchase.numbers.raffleNumber']);

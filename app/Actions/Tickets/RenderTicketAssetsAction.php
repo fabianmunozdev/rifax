@@ -57,21 +57,80 @@ class RenderTicketAssetsAction
         $imagePath = $directory.'/ticket-v'.$version.'.'.$imageExt;
         $thumbnailPath = $directory.'/ticket-thumb-v'.$version.'.'.$thumbExt;
 
-        Storage::disk('public')->put($imagePath, $ticketContents);
-        Storage::disk('public')->put($thumbnailPath, $thumbnailContents);
+        try {
+            $putOk = true;
+            if (filled($ticketContents)) {
+                $putOk = Storage::disk('public')->put($imagePath, $ticketContents) && $putOk;
+            } else {
+                $putOk = false;
+                Log::warning('Ticket asset ticket contents is empty, cannot write.', [
+                    'ticket_id' => $ticket->id,
+                    'ticket_code' => $ticket->code,
+                ]);
+            }
+            if (filled($thumbnailContents)) {
+                $putOk = Storage::disk('public')->put($thumbnailPath, $thumbnailContents) && $putOk;
+            } else {
+                $putOk = false;
+                Log::warning('Ticket asset thumbnail contents is empty, cannot write.', [
+                    'ticket_id' => $ticket->id,
+                    'ticket_code' => $ticket->code,
+                ]);
+            }
+
+            if (! $putOk) {
+                throw new \RuntimeException('Storage::disk public put returned false or empty contents.');
+            }
+
+            $persistedImage = $imagePath;
+            $persistedThumb = $thumbnailPath;
+        } catch (Throwable $e) {
+            Log::warning('Ticket asset storage write failed, falling back to inline SVG paths on best-effort.', [
+                'ticket_id' => $ticket->id,
+                'ticket_code' => $ticket->code,
+                'error' => $e->getMessage(),
+            ]);
+
+            $ticketSvgFallback = $this->buildTicketSvg($ticket, $company, $numbers);
+            $thumbSvgFallback = $this->buildThumbnailSvg($ticket, $company, $numbers);
+            $fallbackImagePath = $directory.'/ticket-v'.$version.'.svg';
+            $fallbackThumbPath = $directory.'/ticket-thumb-v'.$version.'.svg';
+
+            try {
+                Storage::disk('public')->put($fallbackImagePath, $ticketSvgFallback);
+                Storage::disk('public')->put($fallbackThumbPath, $thumbSvgFallback);
+                $persistedImage = $fallbackImagePath;
+                $persistedThumb = $fallbackThumbPath;
+            } catch (Throwable $e2) {
+                Log::error('Ticket SVG fallback storage write also failed; persisting previous paths if any.', [
+                    'ticket_id' => $ticket->id,
+                    'ticket_code' => $ticket->code,
+                    'previous_image_path' => $ticket->getOriginal('image_path'),
+                    'previous_thumbnail_path' => $ticket->getOriginal('thumbnail_path'),
+                    'svg_fallback_error' => $e2->getMessage(),
+                    'primary_error' => $e->getMessage(),
+                ]);
+                $persistedImage = $ticket->getOriginal('image_path') ?? $ticket->image_path ?? null;
+                $persistedThumb = $ticket->getOriginal('thumbnail_path') ?? $ticket->thumbnail_path ?? null;
+            }
+        }
+
+        $persistedImage = filled($persistedImage) ? $persistedImage : $ticket->getOriginal('image_path') ?? $ticket->image_path;
+        $persistedThumb = filled($persistedThumb) ? $persistedThumb : $ticket->getOriginal('thumbnail_path') ?? $ticket->thumbnail_path;
 
         $ticket->forceFill([
-            'image_path' => $imagePath,
-            'thumbnail_path' => $thumbnailPath,
+            'image_path' => $persistedImage,
+            'thumbnail_path' => $persistedThumb,
         ])->save();
 
         Log::debug('Ticket assets rendered.', [
             'ticket_id' => $ticket->id,
             'ticket_code' => $ticket->code,
             'version' => $version,
-            'image_path' => $imagePath,
-            'thumbnail_path' => $thumbnailPath,
+            'image_path' => $persistedImage,
+            'thumbnail_path' => $persistedThumb,
             'renderer' => $renderedWithBrowsershot ? 'browsershot-png' : 'legacy-svg',
+            'storage_write_ok' => isset($putOk) ? $putOk : null,
         ]);
 
         return $ticket->fresh() ?? $ticket;

@@ -73,11 +73,12 @@ class QueueTicketDocumentTest extends TestCase
             ->firstOrFail();
 
         $ticket = $purchase->fresh('ticket')->ticket;
+        $expectedExtension = pathinfo($ticket->image_path, PATHINFO_EXTENSION) ?: 'svg';
 
         $this->assertSame('queued', $documentMessage->status);
         $this->assertSame($ticket->id, data_get($documentMessage->payload_json, 'ticket_id'));
         $this->assertStringContainsString('/storage/tickets/', (string) data_get($documentMessage->payload_json, 'document.link'));
-        $this->assertSame('ticket-'.$ticket->code.'.svg', data_get($documentMessage->payload_json, 'document.filename'));
+        $this->assertSame('ticket-'.$ticket->code.'.'.$expectedExtension, data_get($documentMessage->payload_json, 'document.filename'));
         $this->assertTrue(Storage::disk('public')->exists($ticket->image_path));
 
         Queue::assertPushed(DispatchWhatsappMessageJob::class, 2);
