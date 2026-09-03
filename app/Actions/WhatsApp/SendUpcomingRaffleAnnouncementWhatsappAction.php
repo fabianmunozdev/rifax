@@ -58,13 +58,13 @@ class SendUpcomingRaffleAnnouncementWhatsappAction
                             'draw_time' => $raffle->draw_time ?: '-',
                             'price_per_number' => number_format((float) $raffle->price_per_number, 0),
                             'minimum_numbers' => (string) $raffle->min_numbers_per_purchase,
-                            'lottery_name' => $raffle->lottery_name ?: 'la loteria oficial',
+                            'lottery_name' => $raffle->lottery_name ?: 'la lotería oficial',
                         ],
                         context: [
                             'raffle_id' => $raffle->id,
                             'campaign_type' => 'upcoming_raffle_announcement',
                         ],
-                        fallback: 'Hola {customer_name}, ya esta disponible {raffle_title}. El sorteo sera el {draw_date} a las {draw_time}, cada numero cuesta {price_per_number} y la compra minima es de {minimum_numbers}. Responde MENU para iniciar tu compra.',
+                        fallback: 'Hola {customer_name}, ya está disponible {raffle_title}. El sorteo será el {draw_date} a las {draw_time}, cada número cuesta {price_per_number} y la compra mínima es de {minimum_numbers}. Responde MENU para iniciar tu compra.',
                         dedupHours: 72,
                         templateDefaults: [
                             'template_name' => 'upcoming_raffle_announcement',

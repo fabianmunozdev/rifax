@@ -44,7 +44,7 @@ class SendRaffleWinnerWhatsappNotificationAction
             'result_number' => $raffle->result_number ?: '',
             'ticket_code' => $purchase->ticket?->code ?: 'P-'.str_pad((string) $purchase->id, 6, '0', STR_PAD_LEFT),
             'ticket_url' => $purchase->ticket?->public_url ?: '',
-            'lottery_name' => $raffle->lottery_name ?: 'la loteria oficial',
+            'lottery_name' => $raffle->lottery_name ?: 'la lotería oficial',
             'lottery_draw_number' => $raffle->lottery_draw_number ?: '',
             'lottery_reference_url' => $raffle->lottery_reference_url ?: '',
         ];

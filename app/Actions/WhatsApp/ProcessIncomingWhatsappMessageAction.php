@@ -1107,7 +1107,7 @@ class ProcessIncomingWhatsappMessageAction
             return [
                 'numbers' => [],
                 'error' => 'No identificamos números válidos en tu mensaje.'.PHP_EOL.PHP_EOL
-                    .'Envía solo números separados por coma o espacio. Ejemplo: '.$this->renderNumberExamples(2, $digits),
+                    .'Para continuar vuelve al enlace "Escoge aquí tus números" o responde solo con los dígitos separados por coma o espacio. Ejemplo: '.$this->renderNumberExamples(2, $digits),
             ];
         }
 
@@ -1231,18 +1231,13 @@ class ProcessIncomingWhatsappMessageAction
 
     protected function renderNumberSelectionPrompt(Raffle $raffle, int $quantity): WhatsAppReply|string
     {
-        $digits = $raffle->normalizedNumberDigits();
         $pickerUrl = route('raffles.number-picker', [
             'raffle' => $raffle->slug,
             'quantity' => $quantity,
             'source' => 'whatsapp_manual_prompt',
         ]);
 
-        return "Envía {$quantity} número(s) separados por coma o espacio.".PHP_EOL.PHP_EOL
-            ."Cada número debe tener hasta {$digits} cifra(s).".PHP_EOL
-            .'Ejemplo: '.$this->renderNumberExamples($quantity, $digits).PHP_EOL.PHP_EOL
-            .'Si prefieres verlos en una tabla y seleccionar visualmente, abre este enlace:'.PHP_EOL
-            .$pickerUrl;
+        return 'Escoge aquí tus números:'.PHP_EOL.$pickerUrl;
     }
 
     protected function renderNumberExamples(int $quantity, int $digits): WhatsAppReply|string

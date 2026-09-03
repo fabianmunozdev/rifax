@@ -442,34 +442,34 @@
 
             <div class="picker-meta">
                 <p class="picker-copy">
-                    Elige exactamente <strong>{{ $quantity }}</strong> numero(s) disponibles y continua la compra por WhatsApp con una seleccion temporal que el bot reconocera automaticamente.
+                    Elige exactamente <strong>{{ $quantity }}</strong> número(s) disponibles y continua la compra por WhatsApp con una selección temporal que el bot reconocerá automáticamente.
                 </p>
 
                 <div class="summary summary--compact">
                     @if ($raffle->draw_date || $raffle->draw_time)
                         <span>Sorteo {{ $raffle->draw_date?->format('Y-m-d') ?: 'Pendiente' }} {{ $raffle->draw_time ?: '' }}</span>
                     @else
-                        <span>Fecha de sorteo pendiente de configuracion.</span>
+                        <span>Fecha de sorteo pendiente de configuración.</span>
                     @endif
-                    <span>Catalogo total: {{ number_format((int) $catalogCount) }}</span>
+                    <span>Catálogo total: {{ number_format((int) $catalogCount) }}</span>
                     <span>Disponibles ahora: {{ number_format((int) $availableCount) }}</span>
                     <span id="selection-status">0 seleccionados de {{ $quantity }}</span>
                 </div>
             </div>
 
             @if (! $botPhoneDigits)
-                <p class="warning">No hay un numero de WhatsApp del bot configurado en administracion. Configura `whatsapp_bot_phone` para habilitar el flujo web hacia WhatsApp.</p>
+                <p class="warning">No hay un número de WhatsApp del bot configurado en administración. Configura `whatsapp_bot_phone` para habilitar el flujo web hacia WhatsApp.</p>
             @endif
 
             @if ($numbers === [])
-                <p class="empty">Esta rifa aun no tiene numeros cargados.</p>
+                <p class="empty">Esta rifa aún no tiene números cargados.</p>
             @else
                 <div class="section-stack">
                     <div class="search-shell">
-                        <input type="search" id="number-search" placeholder="Buscar numero..." autocomplete="off">
+                        <input type="search" id="number-search" placeholder="Buscar número..." autocomplete="off">
                     </div>
 
-                    <ul class="legend" aria-label="Estados de numeros">
+                    <ul class="legend" aria-label="Estados de números">
                         <li><span class="legend-swatch legend-swatch--available"></span>Disponible</li>
                         <li><span class="legend-swatch legend-swatch--reserved"></span>Reservado</li>
                         <li><span class="legend-swatch legend-swatch--paid"></span>Pagado</li>
@@ -508,7 +508,7 @@
                     <div class="actions">
                         <div class="actions-row">
                             <div class="selection-preview" id="selection-preview">
-                                Aun no has seleccionado numeros.
+                                Aún no has seleccionado números.
                             </div>
                             <a
                                 id="send-selection-link"
@@ -640,7 +640,7 @@
                 }
 
                 isLoadingNumbers = true;
-                setNumbersStatus(reset ? 'Cargando numeros...' : 'Cargando mas numeros...');
+                setNumbersStatus(reset ? 'Cargando números...' : 'Cargando más números...');
 
                 try {
                     const params = new URLSearchParams({
@@ -664,7 +664,7 @@
                     const payload = await response.json();
 
                     if (!response.ok) {
-                        throw new Error(payload.message || 'No pudimos cargar mas numeros.');
+                        throw new Error(payload.message || 'No pudimos cargar más números.');
                     }
 
                     appendNumberButtons(payload.items || [], { reset });
@@ -673,17 +673,17 @@
 
                     if ((payload.items || []).length === 0) {
                         setNumbersStatus(searchTerm.trim() !== ''
-                            ? 'No encontramos numeros para esa busqueda.'
-                            : 'No hay mas numeros por cargar.');
+                            ? 'No encontramos números para esa búsqueda.'
+                            : 'No hay más números por cargar.');
 
                         return;
                     }
 
                     setNumbersStatus(nextCursor !== ''
-                        ? 'Desliza para cargar mas numeros.'
-                        : 'Ya viste todos los numeros de esta consulta.');
+                        ? 'Desliza para cargar más números.'
+                        : 'Ya viste todos los números de esta consulta.');
                 } catch (error) {
-                    setNumbersStatus(error instanceof Error ? error.message : 'No pudimos cargar mas numeros.');
+                    setNumbersStatus(error instanceof Error ? error.message : 'No pudimos cargar más números.');
                 } finally {
                     isLoadingNumbers = false;
                 }
@@ -694,8 +694,8 @@
                 const count = selectedNumbers.length;
                 status.textContent = `${count} seleccionados de ${requiredQuantity}`;
                 preview.textContent = count > 0
-                    ? `Seleccion actual: ${selectedNumbers.join(', ')}`
-                    : 'Aun no has seleccionado numeros.';
+                    ? `Selección actual: ${selectedNumbers.join(', ')}`
+                    : 'Aún no has seleccionado números.';
 
                 const phone = link.dataset.phone || '';
                 const isReady = !isSubmitting && phone !== '' && count === requiredQuantity;
@@ -789,13 +789,13 @@
                     const payload = await response.json();
 
                     if (!response.ok) {
-                        throw new Error(payload.message || 'No pudimos preparar tu seleccion. Intenta nuevamente.');
+                        throw new Error(payload.message || 'No pudimos preparar tu selección. Intenta nuevamente.');
                     }
 
                     const whatsappMessage = encodeURIComponent(payload.whatsapp_message || `PICKER ${payload.token}`);
                     window.location.href = `https://wa.me/${phone}?text=${whatsappMessage}`;
                 } catch (error) {
-                    setFeedback(error instanceof Error ? error.message : 'No pudimos preparar tu seleccion. Intenta nuevamente.', true);
+                    setFeedback(error instanceof Error ? error.message : 'No pudimos preparar tu selección. Intenta nuevamente.', true);
                 } finally {
                     isSubmitting = false;
                     sync();
@@ -816,7 +816,7 @@
                 observer.observe(sentinel);
             }
 
-            setNumbersStatus(nextCursor !== '' ? 'Desliza para cargar mas numeros.' : '');
+            setNumbersStatus(nextCursor !== '' ? 'Desliza para cargar más números.' : '');
             sync();
         })();
     </script>

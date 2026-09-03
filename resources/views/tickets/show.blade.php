@@ -280,18 +280,18 @@
                 @if($ticketImageUrl)
                     <img src="{{ $ticketImageUrl }}" alt="Boleto {{ data_get($payload, 'ticket.code') }}">
                 @else
-                    <div class="note">Aun no hay una imagen publica disponible para este boleto.</div>
+                    <div class="note">Aún no hay una imagen pública disponible para este boleto.</div>
                 @endif
             </article>
 
             <aside class="panel summary">
                 <div class="summary-grid">
                     <div class="summary-card">
-                        <strong>Codigo</strong>
+                        <strong>Código</strong>
                         <span>{{ data_get($payload, 'ticket.code') }}</span>
                     </div>
                     <div class="summary-card">
-                        <strong>Version</strong>
+                        <strong>Versión</strong>
                         <span>v{{ data_get($payload, 'ticket.version') }}</span>
                     </div>
                     <div class="summary-card">
@@ -305,12 +305,12 @@
                 </div>
 
                 <div>
-                    <strong style="display:block; margin-bottom:10px; font-size:13px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted);">Numeros asignados</strong>
+                    <strong style="display:block; margin-bottom:10px; font-size:13px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted);">Números asignados</strong>
                     <div class="numbers">
                         @forelse($numbers as $number)
                             <span class="number-pill">{{ $number }}</span>
                         @empty
-                            <span class="note">No hay numeros asociados a este boleto.</span>
+                            <span class="note">No hay números asociados a este boleto.</span>
                         @endforelse
                     </div>
                 </div>
@@ -326,7 +326,7 @@
 
                 <div class="note">
                     Conserva este enlace para consultar tu boleto cuando lo necesites.
-                    La plataforma no expone datos personales del comprador en esta vista publica.
+                    La plataforma no expone datos personales del comprador en esta vista pública.
                 </div>
             </aside>
         </section>

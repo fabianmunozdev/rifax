@@ -59,7 +59,7 @@ class SendTicketDocumentWhatsappAction
         }
 
         $raffleTitle = $purchase->raffle_title_snapshot ?: $purchase->raffle?->title ?: 'tu rifa';
-        $caption = 'Tu boleto para '.$raffleTitle.' ya esta disponible.';
+        $caption = 'Tu boleto para '.$raffleTitle.' ya está disponible.';
         $extension = pathinfo($purchase->ticket->image_path, PATHINFO_EXTENSION) ?: 'png';
         $filename = 'ticket-'.$purchase->ticket->code.'.'.$extension;
 

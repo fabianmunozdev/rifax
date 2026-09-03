@@ -118,7 +118,7 @@ class RaffleNumberPickerController extends Controller
 
         if ($selectedNumbers->count() !== $quantity) {
             return response()->json([
-                'message' => "Debes seleccionar exactamente {$quantity} numero(s) para continuar.",
+                'message' => "Debes seleccionar exactamente {$quantity} número(s) para continuar.",
             ], 422);
         }
 
@@ -199,9 +199,9 @@ class RaffleNumberPickerController extends Controller
 
     protected function buildPickerWhatsappMessage(Raffle $raffle, RafflePickerIntent $intent): string
     {
-        return "Hola, quiero continuar con mi seleccion visual de la rifa {$raffle->title}.".PHP_EOL
-            ."Codigo de seleccion: PICKER {$intent->token}".PHP_EOL
-            .'Por favor, mantener este mensaje sin modificar para continuar con la compra.';
+        return "Ya seleccioné mis números y quiero continuar, el código de mi selección es: PICKER {$intent->token}".PHP_EOL
+            ."Rifa: {$raffle->title}".PHP_EOL
+            .'Por favor, no modifiques este mensaje para continuar con la compra.';
     }
 
     /**

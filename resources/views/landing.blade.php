@@ -888,9 +888,9 @@
                 <h1>{{ $company?->trade_name ?: 'Rifax' }}</h1>
                 <p>
                     @if ($featuredRaffle)
-                        Descubre la rifa destacada del momento y entra directo a comprar por WhatsApp o desde la seleccion visual sin friccion.
+                        Descubre la rifa destacada del momento y entra directo a comprar por WhatsApp o desde la selección visual sin fricción.
                     @else
-                        {{ $company?->help_message ?: 'Consulta las rifas publicadas, revisa su disponibilidad actual y entra directo a la seleccion visual de numeros para completar tu compra por WhatsApp.' }}
+                        {{ $company?->help_message ?: 'Consulta las rifas publicadas, revisa su disponibilidad actual y entra directo a la selección visual de números para completar tu compra por WhatsApp.' }}
                     @endif
                 </p>
                 <div class="hero-actions">
@@ -913,7 +913,7 @@
                     <div class="hero-highlight">
                         <span class="hero-badge">Rifa destacada</span>
                         <h2>{{ $featuredRaffle->title }}</h2>
-                        <p>{{ $featuredRaffle->description ?: 'Compra guiada, seleccion visual y seguimiento por WhatsApp en una sola experiencia.' }}</p>
+                        <p>{{ $featuredRaffle->description ?: 'Compra guiada, selección visual y seguimiento por WhatsApp en una sola experiencia.' }}</p>
                         <div class="hero-kpis">
                             <div class="hero-kpi">
                                 <strong>Precio</strong>
@@ -928,19 +928,19 @@
                                 <span>{{ $featuredRaffle->draw_date?->format('Y-m-d') ?: 'Pendiente' }}</span>
                             </div>
                             <div class="hero-kpi">
-                                <strong>Catalogo</strong>
+                                <strong>Catálogo</strong>
                                 <span>{{ number_format((int) $featuredRaffle->numbers_count) }}</span>
                             </div>
                         </div>
                         <div class="hero-callouts">
-                            <span class="hero-callout">Compra minima: {{ $featuredRaffle->min_numbers_per_purchase }} numero(s)</span>
-                            <span class="hero-callout">{{ $featuredRaffle->number_digits }} cifra(s) por numero</span>
+                            <span class="hero-callout">Compra mínima: {{ $featuredRaffle->min_numbers_per_purchase }} número(s)</span>
+                            <span class="hero-callout">{{ $featuredRaffle->number_digits }} cifra(s) por número</span>
                             @if ($featuredRaffle->available_numbers_count > 0)
-                                <span class="hero-callout">Todavia quedan {{ number_format((int) $featuredRaffle->available_numbers_count) }} disponibles</span>
+                                <span class="hero-callout">Todavía quedan {{ number_format((int) $featuredRaffle->available_numbers_count) }} disponibles</span>
                             @endif
                         </div>
                         <div class="hero-actions">
-                            <a class="button button--primary" href="{{ $featuredPickerUrl }}">Elegir numeros ahora</a>
+                            <a class="button button--primary" href="{{ $featuredPickerUrl }}">Elegir números ahora</a>
                             @if ($featuredWhatsappUrl)
                                 <a class="button button--whatsapp" href="{{ $featuredWhatsappUrl }}">Comprar esta rifa por WhatsApp</a>
                             @endif
@@ -961,7 +961,7 @@
                     </div>
                     <p class="hero-support-copy">
                         @if ($raffles->isNotEmpty())
-                            Explora las rifas vigentes, filtra la que te interesa y entra a la tabla visual de numeros para comprar de forma guiada.
+                            Explora las rifas vigentes, filtra la que te interesa y entra a la tabla visual de números para comprar de forma guiada.
                         @else
                             No hay rifas activas publicadas ahora mismo, pero esta landing ya queda lista para mostrarlas apenas se publiquen.
                         @endif
@@ -973,30 +973,30 @@
         <section>
             <div class="section-title">
                 <div>
-                    <h2>Como Funciona</h2>
-                    <p>Un flujo simple, guiado y con validacion humana antes de emitir el boleto.</p>
+                    <h2>Cómo funciona</h2>
+                    <p>Un flujo simple, guiado y con validación humana antes de emitir el boleto.</p>
                 </div>
             </div>
             <div class="steps-grid">
                 <article class="info-card">
                     <span class="step-index">1</span>
                     <h3>Elige tu rifa</h3>
-                    <p>Entras por la landing o por WhatsApp, revisas disponibilidad y eliges tus numeros manualmente o al azar.</p>
+                    <p>Entras por la landing o por WhatsApp, revisas disponibilidad y eliges tus números manualmente o al azar.</p>
                 </article>
                 <article class="info-card">
                     <span class="step-index">2</span>
-                    <h3>Envias el pago</h3>
-                    <p>El sistema te muestra los metodos disponibles y luego envias el comprobante por WhatsApp para revision.</p>
+                    <h3>Envías el pago</h3>
+                    <p>El sistema te muestra los métodos disponibles y luego envías el comprobante por WhatsApp para revisión.</p>
                 </article>
                 <article class="info-card">
                     <span class="step-index">3</span>
-                    <h3>Revision administrativa</h3>
-                    <p>Tu comprobante queda en revision dentro del panel admin para aprobar o rechazar el pago con trazabilidad.</p>
+                    <h3>Revisión administrativa</h3>
+                    <p>Tu comprobante queda en revisión dentro del panel admin para aprobar o rechazar el pago con trazabilidad.</p>
                 </article>
                 <article class="info-card">
                     <span class="step-index">4</span>
                     <h3>Recibes tu boleto</h3>
-                    <p>Una vez aprobado, el sistema genera el ticket y lo envia por WhatsApp con tus numeros y enlace de verificacion.</p>
+                    <p>Una vez aprobado, el sistema genera el ticket y lo envía por WhatsApp con tus números y enlace de verificación.</p>
                 </article>
             </div>
         </section>
@@ -1044,15 +1044,15 @@
         <section id="raffles">
             <div class="section-title">
                 <div>
-                    <h2>{{ $featuredRaffle && $otherRaffles->isNotEmpty() ? 'Mas Rifas Activas' : 'Rifas Disponibles' }}</h2>
-                    <p>Informacion publica orientada a compra directa, filtro rapido y seleccion visual de numeros.</p>
+                    <h2>{{ $featuredRaffle && $otherRaffles->isNotEmpty() ? 'Más rifas activas' : 'Rifas disponibles' }}</h2>
+                    <p>Información pública orientada a compra directa, filtro rápido y selección visual de números.</p>
                 </div>
             </div>
 
             @if ($raffles->isEmpty())
                 <div class="empty">
                     <h3>No hay rifas activas por ahora</h3>
-                    <p>Vuelve pronto o publica una rifa desde administracion para que aparezca automaticamente aqui.</p>
+                    <p>Vuelve pronto o publica una rifa desde administración para que aparezca automáticamente aquí.</p>
                 </div>
             @else
                 @if ($catalogRaffles->count() > 1)
@@ -1092,11 +1092,11 @@
                                     <div>
                                         <span class="sales-copy">
                                             @if ($raffle->available_numbers_count <= 25)
-                                                Ultimos {{ number_format((int) $raffle->available_numbers_count) }} disponibles
+                                                Últimos {{ number_format((int) $raffle->available_numbers_count) }} disponibles
                                             @elseif ($raffle->reserved_numbers_count > 0)
                                                 Alta demanda: {{ number_format((int) $raffle->reserved_numbers_count) }} reservado(s)
                                             @else
-                                                Compra guiada y seleccion visual
+                                                Compra guiada y selección visual
                                             @endif
                                         </span>
                                         <h3 class="raffle-title">{{ $raffle->title }}</h3>
@@ -1107,7 +1107,7 @@
                                 <div class="countdown" @if($drawAt) data-draw-at="{{ $drawAt }}" @endif>
                                     <div class="countdown-card">
                                         <span class="countdown-value" data-unit="days">--</span>
-                                        <span class="countdown-label">Dias</span>
+                                        <span class="countdown-label">Días</span>
                                     </div>
                                     <div class="countdown-card">
                                         <span class="countdown-value" data-unit="hours">--</span>
@@ -1126,12 +1126,12 @@
                                     @if ($raffle->draw_date || $raffle->draw_time)
                                         Sorteo {{ $raffle->draw_date?->format('Y-m-d') ?: 'Pendiente' }} {{ $raffle->draw_time ?: '' }}
                                     @else
-                                        Fecha de sorteo pendiente de configuracion.
+                                        Fecha de sorteo pendiente de configuración.
                                     @endif
                                 </div>
 
                                 <div class="card-actions">
-                                    <a class="button button--teal" href="{{ $pickerUrl }}">Seleccionar numeros</a>
+                                    <a class="button button--teal" href="{{ $pickerUrl }}">Seleccionar números</a>
                                     @if ($directWhatsappUrl)
                                         <a class="button button--whatsapp" href="{{ $directWhatsappUrl }}">
                                             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
@@ -1169,16 +1169,16 @@
 
         <footer class="site-footer">
             <div class="site-footer-grid">
-                <p class="site-footer-title">Informacion Operativa</p>
+                <p class="site-footer-title">Información operativa</p>
 
                 <p class="site-footer-copy">
-                    Los metodos de pago visibles se confirman por WhatsApp y cada comprobante pasa por revision administrativa antes de emitir el boleto digital.
-                    El resultado oficial se toma de la loteria de referencia configurada para cada rifa.
+                    Los métodos de pago visibles se confirman por WhatsApp y cada comprobante pasa por revisión administrativa antes de emitir el boleto digital.
+                    El resultado oficial se toma de la lotería de referencia configurada para cada rifa.
                 </p>
 
                 @if ($paymentMethods->isNotEmpty())
                     <p class="site-footer-copy">
-                        Metodos visibles:
+                        Métodos visibles:
                         @foreach ($paymentMethods as $paymentMethod)
                             <span>{{ $paymentMethod->name }}@if($paymentMethod->account_reference): {{ $paymentMethod->account_reference }}@endif</span>@if (! $loop->last) · @endif
                         @endforeach
@@ -1186,8 +1186,8 @@
                 @endif
 
                 <ul class="site-footer-list">
-                    <li>Tus numeros se reservan por tiempo limitado mientras completas el pago.</li>
-                    <li>Si envias el comprobante antes del sorteo, la compra queda en revision y tus numeros no se liberan automaticamente.</li>
+                    <li>Tus números se reservan por tiempo limitado mientras completas el pago.</li>
+                    <li>Si envías el comprobante antes del sorteo, la compra queda en revisión y tus números no se liberan automáticamente.</li>
                     <li>Las compras pendientes deben resolverse antes de publicar el resultado final dentro de la plataforma.</li>
                 </ul>
 
@@ -1196,7 +1196,7 @@
                         <a href="https://wa.me/{{ $supportPhoneDigits }}?text={{ rawurlencode('PAGOS') }}">Soporte por WhatsApp</a>
                     @endif
                     @if ($company?->terms_url)
-                        <a href="{{ $company->terms_url }}" target="_blank" rel="noopener noreferrer">Terminos</a>
+                        <a href="{{ $company->terms_url }}" target="_blank" rel="noopener noreferrer">Términos</a>
                     @endif
                     @if ($company?->privacy_policy_url)
                         <a href="{{ $company->privacy_policy_url }}" target="_blank" rel="noopener noreferrer">Privacidad</a>

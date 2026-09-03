@@ -53,7 +53,7 @@ class SendRaffleDrawReminderWhatsappAction
                             'raffle_title' => $purchase->raffle_title_snapshot ?: $purchase->raffle?->title ?: 'tu rifa',
                             'draw_date' => $purchase->raffle?->draw_date?->format('Y-m-d') ?: '-',
                             'draw_time' => $purchase->raffle?->draw_time ?: '-',
-                            'lottery_name' => $purchase->raffle?->lottery_name ?: 'la loteria oficial',
+                            'lottery_name' => $purchase->raffle?->lottery_name ?: 'la lotería oficial',
                             'lottery_draw_number' => $purchase->raffle?->lottery_draw_number ?: '-',
                             'ticket_code' => $purchase->ticket?->code ?: 'P-'.str_pad((string) $purchase->id, 6, '0', STR_PAD_LEFT),
                             'ticket_url' => $purchase->ticket?->public_url ?: '',
