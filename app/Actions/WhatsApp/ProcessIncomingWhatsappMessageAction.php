@@ -371,7 +371,7 @@ class ProcessIncomingWhatsappMessageAction
         };
     }
 
-    protected function handleMainMenu(Customer $customer, ConversationState $state, string $text): string
+    protected function handleMainMenu(Customer $customer, ConversationState $state, string $text): WhatsAppReply|string
     {
         if ($text === '' || ! in_array($text, ['1', '2', '3', '4', '5', '6', '7'], true)) {
             return $this->renderMainMenu();
@@ -417,7 +417,7 @@ class ProcessIncomingWhatsappMessageAction
         };
     }
 
-    protected function handlePurchaseSelectRaffle(ConversationState $state, string $text): string
+    protected function handlePurchaseSelectRaffle(ConversationState $state, string $text): WhatsAppReply|string
     {
         if ($state->current_raffle_id === null) {
             $raffles = $this->getActiveRaffles();
@@ -469,7 +469,7 @@ class ProcessIncomingWhatsappMessageAction
         return 'Responde 1 para continuar o 2 para volver al menú.';
     }
 
-    protected function handlePurchaseEnterQuantity(ConversationState $state, string $text): string
+    protected function handlePurchaseEnterQuantity(ConversationState $state, string $text): WhatsAppReply|string
     {
         $raffle = $this->getConversationRaffle($state);
 
@@ -498,7 +498,7 @@ class ProcessIncomingWhatsappMessageAction
         return $this->renderChooseMode();
     }
 
-    protected function handlePurchaseChooseMode(Customer $customer, ConversationState $state, string $text): string
+    protected function handlePurchaseChooseMode(Customer $customer, ConversationState $state, string $text): WhatsAppReply|string
     {
         if (! in_array($text, ['1', '2'], true)) {
             return 'Responde 1 para elegir manualmente o 2 para asignación aleatoria.';
@@ -544,7 +544,7 @@ class ProcessIncomingWhatsappMessageAction
         return $this->renderReservationConfirmation($purchase);
     }
 
-    protected function handlePurchaseSelectNumbers(Customer $customer, ConversationState $state, string $text): string
+    protected function handlePurchaseSelectNumbers(Customer $customer, ConversationState $state, string $text): WhatsAppReply|string
     {
         $raffle = $this->getConversationRaffle($state);
 
@@ -576,7 +576,7 @@ class ProcessIncomingWhatsappMessageAction
         return $this->renderReservationConfirmation($purchase);
     }
 
-    protected function handlePaymentProofStep(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage): string
+    protected function handlePaymentProofStep(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage): WhatsAppReply|string
     {
         $purchase = $state->purchase;
 
@@ -638,7 +638,7 @@ class ProcessIncomingWhatsappMessageAction
         return 'Hemos recibido tu comprobante y tu compra está en revisión.'.PHP_EOL.PHP_EOL.'Te avisaremos por este medio cuando el pago sea aprobado o rechazado.'.PHP_EOL.PHP_EOL.'Si necesitas reemplazar el comprobante antes de la revisión, escribe REEMPLAZAR y envía la nueva imagen.';
     }
 
-    protected function handlePurchaseUnderReview(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage, string $normText): string
+    protected function handlePurchaseUnderReview(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage, string $normText): WhatsAppReply|string
     {
         $purchase = $state->purchase;
 
@@ -711,7 +711,7 @@ class ProcessIncomingWhatsappMessageAction
         return WhatsAppReply::make($info, $buttons);
     }
 
-    protected function handlePickerIntent(Customer $customer, ConversationState $state, string $token): string
+    protected function handlePickerIntent(Customer $customer, ConversationState $state, string $token): WhatsAppReply|string
     {
         $intent = RafflePickerIntent::query()
             ->with('raffle')
@@ -791,7 +791,7 @@ class ProcessIncomingWhatsappMessageAction
             || $this->isRepurchaseShortcut($text);
     }
 
-    protected function handleClosedPurchaseReentry(ConversationState $state, string $text): string
+    protected function handleClosedPurchaseReentry(ConversationState $state, string $text): WhatsAppReply|string
     {
         $previousStatus = $state->status;
 
@@ -900,7 +900,7 @@ class ProcessIncomingWhatsappMessageAction
         return null;
     }
 
-    protected function handleOnboardingPrivacyConsent(Customer $customer, ConversationState $state, string $text): string
+    protected function handleOnboardingPrivacyConsent(Customer $customer, ConversationState $state, string $text): WhatsAppReply|string
     {
         if (in_array($text, ['1', 'ACEPTO', 'ACEPTAR', 'SI ACEPTO', 'SÍ ACEPTO'], true)) {
             $customer->forceFill([
@@ -923,7 +923,7 @@ class ProcessIncomingWhatsappMessageAction
         return $this->renderPrivacyConsentPrompt();
     }
 
-    protected function handleOnboardingCollectName(Customer $customer, ConversationState $state, string $rawText): string
+    protected function handleOnboardingCollectName(Customer $customer, ConversationState $state, string $rawText): WhatsAppReply|string
     {
         $name = trim($rawText);
 
@@ -951,7 +951,7 @@ class ProcessIncomingWhatsappMessageAction
         };
     }
 
-    protected function handleOnboardingCollectDocument(Customer $customer, ConversationState $state, string $rawText): string
+    protected function handleOnboardingCollectDocument(Customer $customer, ConversationState $state, string $rawText): WhatsAppReply|string
     {
         $digits = preg_replace('/\D+/', '', $rawText) ?? '';
 
@@ -1046,12 +1046,12 @@ class ProcessIncomingWhatsappMessageAction
         ]);
     }
 
-    protected function renderCollectNamePrompt(): string
+    protected function renderCollectNamePrompt(): WhatsAppReply|string
     {
         return 'Para continuar con tu compra, por favor responde con tu nombre completo.';
     }
 
-    protected function renderCollectDocumentPrompt(): string
+    protected function renderCollectDocumentPrompt(): WhatsAppReply|string
     {
         return 'Ahora responde con tu número de cédula (solo números).';
     }
@@ -1192,7 +1192,7 @@ class ProcessIncomingWhatsappMessageAction
     /**
      * @param  Collection<int, Raffle>  $raffles
      */
-    protected function renderRaffleOptions(Collection $raffles): string
+    protected function renderRaffleOptions(Collection $raffles): WhatsAppReply|string
     {
         $options = $raffles
             ->values()
@@ -1211,7 +1211,7 @@ class ProcessIncomingWhatsappMessageAction
             .'Responde con el número de la rifa que deseas comprar o escribe MENU.';
     }
 
-    protected function renderQuantityPrompt(Raffle $raffle): string
+    protected function renderQuantityPrompt(Raffle $raffle): WhatsAppReply|string
     {
         return '¿Cuántos números deseas comprar?'.PHP_EOL.PHP_EOL
             ."Compra mínima para esta rifa: {$raffle->min_numbers_per_purchase}";
@@ -1229,7 +1229,7 @@ class ProcessIncomingWhatsappMessageAction
         ]);
     }
 
-    protected function renderNumberSelectionPrompt(Raffle $raffle, int $quantity): string
+    protected function renderNumberSelectionPrompt(Raffle $raffle, int $quantity): WhatsAppReply|string
     {
         $digits = $raffle->normalizedNumberDigits();
         $pickerUrl = route('raffles.number-picker', [
@@ -1245,7 +1245,7 @@ class ProcessIncomingWhatsappMessageAction
             .$pickerUrl;
     }
 
-    protected function renderNumberExamples(int $quantity, int $digits): string
+    protected function renderNumberExamples(int $quantity, int $digits): WhatsAppReply|string
     {
         $count = max(2, min($quantity, 3));
 
@@ -1279,7 +1279,7 @@ class ProcessIncomingWhatsappMessageAction
         ]);
     }
 
-    protected function renderReservationWindowMessage(Purchase $purchase): string
+    protected function renderReservationWindowMessage(Purchase $purchase): WhatsAppReply|string
     {
         $purchase->loadMissing('raffle');
 
@@ -1321,7 +1321,7 @@ class ProcessIncomingWhatsappMessageAction
         ]);
     }
 
-    protected function renderPaymentInstructionsList(Purchase $purchase): string
+    protected function renderPaymentInstructionsList(Purchase $purchase): WhatsAppReply|string
     {
         $snapshot = collect($purchase->payment_instructions_snapshot ?? [])
             ->map(function (mixed $method, int $index): ?string {
@@ -1358,7 +1358,7 @@ class ProcessIncomingWhatsappMessageAction
     /**
      * @param  array{name?: mixed, instructions?: mixed, account_holder?: mixed, account_reference?: mixed, details?: mixed}  $method
      */
-    protected function renderPaymentInstructionEntry(array $method, ?int $index = null): string
+    protected function renderPaymentInstructionEntry(array $method, ?int $index = null): WhatsAppReply|string
     {
         $lines = [];
         $name = trim((string) ($method['name'] ?? ''));
@@ -1406,7 +1406,7 @@ class ProcessIncomingWhatsappMessageAction
         return implode(PHP_EOL, $lines);
     }
 
-    protected function renderAvailableNumbers(): string
+    protected function renderAvailableNumbers(): WhatsAppReply|string
     {
         $raffles = $this->getActiveRaffles();
 
@@ -1434,7 +1434,7 @@ class ProcessIncomingWhatsappMessageAction
             .'Si deseas comprar, responde 1.';
     }
 
-    protected function renderMyNumbers(Customer $customer): string
+    protected function renderMyNumbers(Customer $customer): WhatsAppReply|string
     {
         $summary = $customer->purchases()
             ->with('numbers')
@@ -1453,7 +1453,7 @@ class ProcessIncomingWhatsappMessageAction
             : 'Aún no tienes compras registradas.';
     }
 
-    protected function renderStatistics(): string
+    protected function renderStatistics(): WhatsAppReply|string
     {
         $raffles = $this->getActiveRaffles();
 
@@ -1489,7 +1489,7 @@ class ProcessIncomingWhatsappMessageAction
         return 'Estas son las estadísticas de las rifas activas:'.PHP_EOL.PHP_EOL.$summary;
     }
 
-    protected function renderConditions(): string
+    protected function renderConditions(): WhatsAppReply|string
     {
         return $this->resolvePublishedContentAction->byIntent(
             'terms_conditions',
@@ -1503,7 +1503,7 @@ class ProcessIncomingWhatsappMessageAction
         );
     }
 
-    protected function renderHelp(): string
+    protected function renderHelp(): WhatsAppReply|string
     {
         return $this->resolvePublishedContentAction->byIntent(
             'help_support',
@@ -1516,7 +1516,7 @@ class ProcessIncomingWhatsappMessageAction
         );
     }
 
-    protected function renderUpcomingRaffles(): string
+    protected function renderUpcomingRaffles(): WhatsAppReply|string
     {
         $base = $this->resolvePublishedContentAction->byIntent(
             'upcoming_raffles',
@@ -1726,7 +1726,7 @@ class ProcessIncomingWhatsappMessageAction
         ]);
     }
 
-    protected function handleFaqShortcut(ConversationState $state, string $text): string
+    protected function handleFaqShortcut(ConversationState $state, string $text): WhatsAppReply|string
     {
         $norm = $this->normalizeKeywordText($text);
 
@@ -1739,7 +1739,7 @@ class ProcessIncomingWhatsappMessageAction
         };
     }
 
-    protected function renderPaymentMethods(): string
+    protected function renderPaymentMethods(): WhatsAppReply|string
     {
         $base = $this->resolvePublishedContentAction->byIntent(
             'payment_methods',
@@ -1760,7 +1760,7 @@ class ProcessIncomingWhatsappMessageAction
             : $base;
     }
 
-    protected function renderDrawDate(ConversationState $state): string
+    protected function renderDrawDate(ConversationState $state): WhatsAppReply|string
     {
         $raffle = $state->currentRaffle;
 
