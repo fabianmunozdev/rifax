@@ -122,9 +122,27 @@ class ProcessIncomingWhatsappMessageAction
      */
     protected function resolveCustomer(array $message, array $contacts): Customer
     {
-        $waId = (string) (Arr::get($contacts, '0.wa_id') ?: Arr::get($message, 'from'));
-        $digits = preg_replace('/\D+/', '', $waId) ?? $waId;
-        $phone = Str::startsWith($digits, '+') ? $digits : '+'.$digits;
+        $waIdRaw = (string) (Arr::get($contacts, '0.wa_id') ?: Arr::get($message, 'from'));
+        $fromRaw = (string) Arr::get($message, 'from');
+        $waDigits = (string) preg_replace('/\D+/', '', $waIdRaw);
+        if ($waDigits === '') {
+            $waDigits = (string) preg_replace('/\D+/', '', $fromRaw);
+        }
+
+        if ($waDigits === '' || strlen($waDigits) < 7) {
+            throw new InvalidArgumentException(
+                'No se pudo obtener un número de teléfono válido desde el mensaje. waIdRaw='
+                .$waIdRaw.' fromRaw='.$fromRaw,
+            );
+        }
+
+        $phone = Customer::normalizePhone($waDigits);
+        if ($phone === null) {
+            throw new InvalidArgumentException(
+                'No se pudo normalizar el número del mensaje. waDigits='.$waDigits,
+            );
+        }
+
         $name = trim((string) Arr::get($contacts, '0.profile.name', ''));
 
         $customer = Customer::query()->firstOrNew([
@@ -135,7 +153,7 @@ class ProcessIncomingWhatsappMessageAction
             $customer->name = $name;
         }
 
-        $customer->wa_id = $digits;
+        $customer->wa_id = $waDigits;
         $customer->last_interaction_at = now();
         $customer->save();
 

@@ -8,6 +8,8 @@ use App\Actions\WhatsApp\ValidateIncomingWhatsappWebhookSignatureAction;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
 
 class WhatsappWebhookController extends Controller
@@ -48,7 +50,19 @@ class WhatsappWebhookController extends Controller
                         $value = $change['value'] ?? [];
                         $contacts = $value['contacts'] ?? [];
                         $messageResponses = collect($value['messages'] ?? [])
-                            ->map(fn (array $message): array => $processor->execute($message, $contacts));
+                            ->map(function (array $message) use ($processor, $contacts): array {
+                                try {
+                                    return $processor->execute($message, $contacts);
+                                } catch (InvalidArgumentException $e) {
+                                    Log::warning('[WhatsappWebhook] Skipping inbound with invalid phone: '
+                                        .$e->getMessage().' message='.json_encode($message, JSON_UNESCAPED_UNICODE));
+
+                                    return [
+                                        'skipped' => true,
+                                        'reason' => $e->getMessage(),
+                                    ];
+                                }
+                            });
 
                         $statusResponses = collect($value['statuses'] ?? [])
                             ->map(fn (array $status): array => $statusProcessor->execute($status));

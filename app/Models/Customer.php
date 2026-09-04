@@ -34,6 +34,27 @@ class Customer extends Model
         ];
     }
 
+    public function setPhoneAttribute(mixed $value): void
+    {
+        $this->attributes['phone'] = self::normalizePhone($value);
+    }
+
+    public function setWaIdAttribute(mixed $value): void
+    {
+        $digits = (string) preg_replace('/\D+/', '', (string) $value;
+        $this->attributes['wa_id'] = $digits === '' ? null : $digits;
+    }
+
+    public static function normalizePhone(mixed $value): ?string
+    {
+        $digits = (string) preg_replace('/\D+/', '', (string) $value);
+        if ($digits === '') {
+            return null;
+        }
+
+        return '+'.$digits;
+    }
+
     public function conversationStates(): HasMany
     {
         return $this->hasMany(ConversationState::class);

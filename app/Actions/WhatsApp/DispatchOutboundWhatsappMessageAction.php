@@ -17,11 +17,12 @@ class DispatchOutboundWhatsappMessageAction
             return $message->fresh() ?? $message;
         }
 
-        $waId = $customer->wa_id ?: preg_replace('/\D+/', '', $customer->phone ?? '');
+        $waId = $customer->wa_id ?: preg_replace('/\D+/', '', (string) ($customer->phone ?? ''));
         $phoneNumberId = (string) config('services.whatsapp.phone_number_id');
         $accessToken = (string) config('services.whatsapp.access_token');
+        $waDigits = (string) preg_replace('/\D+/', '', (string) $waId);
 
-        if ($waId === null || $waId === '' || $phoneNumberId === '' || $accessToken === '') {
+        if ($waDigits === '' || strlen($waDigits) < 7 || $phoneNumberId === '' || $accessToken === '') {
             $message->forceFill([
                 'status' => 'failed',
                 'payload_json' => array_merge($message->payload_json ?? [], [
