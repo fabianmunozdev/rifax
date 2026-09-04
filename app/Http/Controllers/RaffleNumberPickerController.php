@@ -441,7 +441,10 @@ class RaffleNumberPickerController extends Controller
                 $dt = \Illuminate\Support\Carbon::parse($validated['until'])->tz('America/Bogota');
                 if ($dt->getTimestamp() > now()->getTimestamp()) {
                     $reservedUntilIso = $dt->toIso8601String();
-                    $reservedUntilAbsolute = $dt->isoFormat('h:mm A');
+                    $hour12 = $dt->format('g');
+                    $minutes = $dt->format('i');
+                    $ampm = $dt->format('A') === 'AM' ? 'a. m.' : 'p. m.';
+                    $reservedUntilAbsolute = "{$hour12}:{$minutes} {$ampm}";
                 }
             } catch (\Throwable) {
                 $reservedUntilIso = null;
