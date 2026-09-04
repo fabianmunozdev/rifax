@@ -43,6 +43,12 @@ class WhatsappWebhookController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
+        Log::info('[WhatsappWebhook] inbound raw payload', [
+            'payload' => $request->input(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
         $responses = collect($request->input('entry', []))
             ->flatMap(function (array $entry) use ($processor, $statusProcessor) {
                 return collect($entry['changes'] ?? [])
