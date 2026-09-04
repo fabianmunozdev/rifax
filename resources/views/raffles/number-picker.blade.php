@@ -594,7 +594,7 @@
                                 <svg class="cta-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
                                     <path d="M19.05 4.91A9.82 9.82 0 0 0 12.03 2C6.57 2 2.12 6.42 2.12 11.88c0 1.75.46 3.46 1.34 4.97L2 22l5.3-1.39a9.9 9.9 0 0 0 4.73 1.21h.01c5.46 0 9.88-4.42 9.88-9.88a9.8 9.8 0 0 0-2.87-7.03Zm-7.02 15.24h-.01a8.2 8.2 0 0 1-4.18-1.14l-.3-.18-3.15.83.84-3.07-.2-.32a8.16 8.16 0 0 1-1.25-4.38c0-4.5 3.67-8.16 8.19-8.16a8.1 8.1 0 0 1 5.78 2.4 8.12 8.12 0 0 1 2.38 5.78c0 4.51-3.67 8.17-8.1 8.24Zm4.48-6.13c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.01-.37-1.92-1.19-.71-.63-1.19-1.4-1.33-1.64-.14-.24-.02-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.31-.74-1.8-.2-.47-.4-.4-.54-.4h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.68 2.56 4.07 3.59.57.25 1.01.4 1.36.52.57.18 1.08.15 1.48.09.45-.07 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z"/>
                                 </svg>
-                                <span class="cta-label">{{ ($pickerConfirmUrl ?? '') !== '' ? 'Confirmar selección y reservar' : 'Continuar compra por WhatsApp' }}</span>
+                                <span class="cta-label">{{ ($pickerConfirmUrl ?? '') !== '' ? 'Confirmar mi selección' : 'Continuar compra por WhatsApp' }}</span>
                             </a>
                         </div>
                         <div class="actions-foot">
@@ -877,8 +877,24 @@
                         const payload = await response.json();
 
                         if (response.ok && payload?.ok === true) {
+                            const nextUrl = typeof payload?.redirect_url === 'string' && payload.redirect_url !== ''
+                                ? payload.redirect_url
+                                : null;
+                            if (nextUrl !== null) {
+                                link.innerHTML = hasConfirm
+                                    ? '<svg class="cta-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="cta-label">Redirigiendo...</span>'
+                                    : defaultCtaHtml;
+                                link.setAttribute('aria-disabled', 'true');
+                                isSubmitting = false;
+                                try {
+                                    window.location.assign(nextUrl);
+                                } catch (_) {
+                                    window.location.href = nextUrl;
+                                }
+                                return;
+                            }
                             setFeedback(
-                                '¡Listo! Tu reserva se creó exitosamente. Revisa tu WhatsApp para continuar con el pago.',
+                                payload?.message || '¡Listo! Tu reserva se creó exitosamente. Revisa tu WhatsApp para continuar con el pago.',
                                 false
                             );
                             link.innerHTML = defaultCtaHtml;

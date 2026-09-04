@@ -6,6 +6,7 @@ use App\Models\CompanySetting;
 use App\Models\Customer;
 use App\Models\Purchase;
 use App\Models\Raffle;
+use App\Models\RaffleNumber;
 use App\Models\RafflePickerIntent;
 use App\Support\PickerAuthToken;
 use App\Support\PickerPurchaseOrchestrator;
@@ -15,6 +16,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -358,6 +360,8 @@ class RaffleNumberPickerController extends Controller
         $onboardingStatus = (string) ($result['onboarding_status'] ?? '');
 
         if ($requiresOnboarding) {
+            $redirect = $this->buildConfirmedRedirectUrl($raffle, $selectedNumbers->all(), null, true);
+
             return response()->json([
                 'ok' => true,
                 'requires_onboarding' => true,
@@ -365,6 +369,7 @@ class RaffleNumberPickerController extends Controller
                 'outbound_sent' => (bool) ($result['outbound_sent'] ?? false),
                 'outbound_status' => (string) ($result['outbound_status'] ?? ''),
                 'message' => 'Para finalizar tu reserva necesitamos que completes unos datos rápidos por WhatsApp. Revisa tu chat, ya te enviamos las instrucciones.',
+                ...$redirect,
             ], 200);
         }
 
@@ -377,6 +382,8 @@ class RaffleNumberPickerController extends Controller
 
         $outboundSent = (bool) ($result['outbound_sent'] ?? false);
         $outboundError = isset($result['outbound_error']) && is_string($result['outbound_error']) ? $result['outbound_error'] : null;
+
+        $redirect = $this->buildConfirmedRedirectUrl($raffle, $selectedNumbers->all(), $purchase, false);
 
         $body = [
             'ok' => true,
@@ -391,12 +398,94 @@ class RaffleNumberPickerController extends Controller
             'message' => $outboundSent
                 ? '¡Reserva confirmada! Revisa tu WhatsApp, ya te enviamos la confirmación y los datos de pago.'
                 : 'Tu reserva fue creada correctamente, pero no pudimos enviarte el mensaje por WhatsApp en este momento. Por favor usa el botón para continuar el proceso por WhatsApp.',
+            ...$redirect,
         ];
         if ($outboundError !== null && $outboundError !== '') {
             $body['outbound_error'] = $outboundError;
         }
 
         return response()->json($body, 200);
+    }
+
+    public function confirmed(Request $request, Raffle $raffle): View
+    {
+        if (! URL::hasValidSignature($request)) {
+            abort(403, 'Enlace de confirmación inválido. Vuelve a intentar la selección desde el bot de WhatsApp.');
+        }
+
+        $validated = $request->validate([
+            'numbers' => ['required', 'array', 'min:1'],
+            'numbers.*' => ['required', 'string'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+            'unit' => ['nullable', 'numeric', 'min:0'],
+            'until' => ['nullable', 'string', 'max:80'],
+            'requires_onboarding' => ['nullable', 'boolean'],
+            'ref' => ['nullable', 'string', 'max:64'],
+            'phone' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        $numbers = array_values(array_filter(array_map('strval', $validated['numbers'])));
+        $company = CompanySetting::query()->first();
+        $botPhoneDigits = $this->normalizePhoneDigits($company?->whatsapp_bot_phone);
+
+        $whatsappOpenUrl = $botPhoneDigits !== null
+            ? 'https://wa.me/'.$botPhoneDigits
+            : '';
+
+        return view('raffles.number-picker-confirmed', [
+            'raffle' => $raffle,
+            'company' => $company,
+            'reservedNumbers' => $numbers,
+            'totalAmount' => isset($validated['amount']) ? (float) $validated['amount'] : null,
+            'unitPrice' => isset($validated['unit']) ? (float) $validated['unit'] : null,
+            'reservedUntilText' => isset($validated['until']) && is_string($validated['until']) ? (string) $validated['until'] : null,
+            'requiresOnboarding' => (bool) ($validated['requires_onboarding'] ?? false),
+            'referenceLabel' => isset($validated['ref']) && is_string($validated['ref']) ? (string) $validated['ref'] : null,
+            'whatsappOpenUrl' => $whatsappOpenUrl,
+        ]);
+    }
+
+    /**
+     * @param  list<string>  $numbers
+     * @return array{redirect_url:string}
+     */
+    protected function buildConfirmedRedirectUrl(Raffle $raffle, array $numbers, ?Purchase $purchase, bool $requiresOnboarding): array
+    {
+        $params = [
+            'numbers' => array_values(array_map('strval', $numbers)),
+            'requires_onboarding' => $requiresOnboarding ? '1' : '0',
+        ];
+
+        if ($purchase instanceof Purchase && $purchase->exists) {
+            $params['amount'] = (string) $purchase->total_amount;
+            $params['unit'] = (string) $purchase->unit_price;
+            if ($purchase->reserved_until !== null) {
+                try {
+                    $params['until'] = $purchase->reserved_until
+                        ->timezone(config('app.timezone', 'America/Bogota'))
+                        ->isoFormat('D MMM YYYY, h:mm A');
+                } catch (\Throwable) {
+                    $params['until'] = $purchase->reserved_until->format('Y-m-d H:i');
+                }
+            }
+            $params['ref'] = 'PUR-'.$purchase->id;
+        }
+
+        $customerPhone = $purchase?->customer?->phone;
+        if (is_string($customerPhone) && $customerPhone !== '') {
+            $digits = preg_replace('/\D+/', '', $customerPhone) ?: '';
+            if ($digits !== '') {
+                $params['phone'] = $digits;
+            }
+        }
+
+        return [
+            'redirect_url' => URL::temporarySignedRoute(
+                'raffles.number-picker.confirmed',
+                now()->addMinutes(60),
+                array_merge(['raffle' => $raffle->slug], $params)
+            ),
+        ];
     }
 
     protected function normalizePhoneDigits(?string $phone): ?string

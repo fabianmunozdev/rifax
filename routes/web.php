@@ -23,6 +23,8 @@ Route::post('/raffles/{raffle:slug}/number-picker/intents', [RaffleNumberPickerC
     ->name('raffles.number-picker.intents');
 Route::post('/raffles/{raffle:slug}/number-picker/confirm', [RaffleNumberPickerController::class, 'confirm'])
     ->name('raffles.number-picker.confirm');
+Route::get('/raffles/{raffle:slug}/number-picker/confirmed', [RaffleNumberPickerController::class, 'confirmed'])
+    ->name('raffles.number-picker.confirmed');
 
 Route::get('/', PublicLandingController::class)
     ->name('landing');
