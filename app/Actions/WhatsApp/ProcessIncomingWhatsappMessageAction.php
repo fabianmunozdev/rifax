@@ -130,10 +130,6 @@ class ProcessIncomingWhatsappMessageAction
             $waDigits = (string) preg_replace('/\D+/', '', $fromRaw);
         }
 
-        if ($waDigits === '') {
-            $waDigits = (string) preg_replace('/\D+/', '', $fromUserIdRaw);
-        }
-
         if ($waDigits === '' || strlen($waDigits) < 7) {
             throw new InvalidArgumentException(
                 'No se pudo obtener un número de teléfono válido desde el mensaje. waIdRaw='
