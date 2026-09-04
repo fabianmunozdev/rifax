@@ -432,6 +432,23 @@ class RaffleNumberPickerController extends Controller
             ? 'https://wa.me/'.$botPhoneDigits
             : '';
 
+        $requiresOnboarding = (bool) ($validated['requires_onboarding'] ?? false);
+
+        $reservedUntilIso = null;
+        $reservedUntilAbsolute = null;
+        if (! $requiresOnboarding && isset($validated['until']) && is_string($validated['until']) && $validated['until'] !== '') {
+            try {
+                $dt = \Illuminate\Support\Carbon::parse($validated['until'])->tz('America/Bogota');
+                if ($dt->getTimestamp() > now()->getTimestamp()) {
+                    $reservedUntilIso = $dt->toIso8601String();
+                    $reservedUntilAbsolute = $dt->isoFormat('h:mm A');
+                }
+            } catch (\Throwable) {
+                $reservedUntilIso = null;
+                $reservedUntilAbsolute = null;
+            }
+        }
+
         return view('raffles.number-picker-confirmed', [
             'raffle' => $raffle,
             'company' => $company,
@@ -439,7 +456,9 @@ class RaffleNumberPickerController extends Controller
             'totalAmount' => isset($validated['amount']) ? (float) $validated['amount'] : null,
             'unitPrice' => isset($validated['unit']) ? (float) $validated['unit'] : null,
             'reservedUntilText' => isset($validated['until']) && is_string($validated['until']) ? (string) $validated['until'] : null,
-            'requiresOnboarding' => (bool) ($validated['requires_onboarding'] ?? false),
+            'reservedUntilIso' => $reservedUntilIso,
+            'reservedUntilAbsolute' => $reservedUntilAbsolute,
+            'requiresOnboarding' => $requiresOnboarding,
             'referenceLabel' => isset($validated['ref']) && is_string($validated['ref']) ? (string) $validated['ref'] : null,
             'whatsappOpenUrl' => $whatsappOpenUrl,
         ]);
@@ -461,11 +480,10 @@ class RaffleNumberPickerController extends Controller
             $params['unit'] = (string) $purchase->unit_price;
             if ($purchase->reserved_until !== null) {
                 try {
-                    $params['until'] = $purchase->reserved_until
-                        ->timezone(config('app.timezone', 'America/Bogota'))
-                        ->isoFormat('D MMM YYYY, h:mm A');
+                    $until = $purchase->reserved_until->tz('America/Bogota');
+                    $params['until'] = $until->toIso8601String();
                 } catch (\Throwable) {
-                    $params['until'] = $purchase->reserved_until->format('Y-m-d H:i');
+                    $params['until'] = $purchase->reserved_until->toIso8601String();
                 }
             }
             $params['ref'] = 'PUR-'.$purchase->id;

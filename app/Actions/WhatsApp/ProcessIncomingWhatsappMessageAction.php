@@ -18,6 +18,7 @@ use App\Support\PickerAuthToken;
 use App\Support\WhatsAppReply;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -596,7 +597,9 @@ class ProcessIncomingWhatsappMessageAction
             return 'No pudimos reservar los números aleatorios en este momento. Intenta nuevamente.';
         }
 
-        return $this->renderReservationConfirmation($purchase);
+        $redirect = $this->buildConfirmedRedirectUrl($raffle, $numbers, $purchase, false);
+
+        return $this->renderReservationConfirmation($purchase, $redirect['redirect_url'] ?? null);
     }
 
     protected function handlePurchaseSelectNumbers(Customer $customer, ConversationState $state, string $text): WhatsAppReply|string
@@ -628,7 +631,9 @@ class ProcessIncomingWhatsappMessageAction
             return 'Uno o más números no están disponibles. Puedes elegir otros números o escribir MENU.';
         }
 
-        return $this->renderReservationConfirmation($purchase);
+        $redirect = $this->buildConfirmedRedirectUrl($raffle, $numbers, $purchase, false);
+
+        return $this->renderReservationConfirmation($purchase, $redirect['redirect_url'] ?? null);
     }
 
     protected function handlePaymentProofStep(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage): WhatsAppReply|string
@@ -828,7 +833,9 @@ class ProcessIncomingWhatsappMessageAction
             'consumed_by_customer_id' => $customer->id,
         ])->save();
 
-        return $this->renderReservationConfirmation($purchase);
+        $redirect = $this->buildConfirmedRedirectUrl($raffle, $numbers, $purchase, false);
+
+        return $this->renderReservationConfirmation($purchase, $redirect['redirect_url'] ?? null);
     }
 
     protected function shouldReenterClosedPurchaseFlow(ConversationState $state, string $text): bool
@@ -1312,7 +1319,7 @@ class ProcessIncomingWhatsappMessageAction
             ->implode(',');
     }
 
-    protected function renderReservationConfirmation(Purchase $purchase): WhatsAppReply|string
+    protected function renderReservationConfirmation(Purchase $purchase, ?string $confirmedUrl = null): WhatsAppReply|string
     {
         $reservedNumbers = $purchase->numbers->pluck('number')->implode(', ');
         $paymentInstructions = $this->renderPaymentInstructionsList($purchase);
@@ -1331,10 +1338,48 @@ class ProcessIncomingWhatsappMessageAction
         $body = $message.PHP_EOL.PHP_EOL
             .'Después de pagar, envía una foto clara del comprobante por este chat para continuar.';
 
+        if (is_string($confirmedUrl) && $confirmedUrl !== '') {
+            $body .= PHP_EOL.PHP_EOL.'⏱️ Mira el tiempo restante en vivo y continúa el proceso aquí:'.$confirmedUrl;
+        }
+
         return WhatsAppReply::make($body, [
             ['id' => 'cancel_purchase', 'title' => 'Cancelar'],
             ['id' => 'payment_menu', 'title' => 'Menú'],
         ]);
+    }
+
+    /**
+     * @param  list<string>  $numbers
+     * @return array{redirect_url:string}
+     */
+    protected function buildConfirmedRedirectUrl(Raffle $raffle, array $numbers, ?Purchase $purchase, bool $requiresOnboarding): array
+    {
+        $params = [
+            'numbers' => array_values(array_map('strval', $numbers)),
+            'requires_onboarding' => $requiresOnboarding ? '1' : '0',
+        ];
+
+        if ($purchase instanceof Purchase && $purchase->exists) {
+            $params['amount'] = (string) $purchase->total_amount;
+            $params['unit'] = (string) $purchase->unit_price;
+            if ($purchase->reserved_until !== null) {
+                try {
+                    $until = $purchase->reserved_until->tz('America/Bogota');
+                    $params['until'] = $until->toIso8601String();
+                } catch (\Throwable) {
+                    $params['until'] = $purchase->reserved_until->toIso8601String();
+                }
+            }
+            $params['ref'] = 'PUR-'.$purchase->id;
+        }
+
+        return [
+            'redirect_url' => URL::temporarySignedRoute(
+                'raffles.number-picker.confirmed',
+                now()->addMinutes(60),
+                array_merge(['raffle' => $raffle->slug], $params)
+            ),
+        ];
     }
 
     protected function renderReservationWindowMessage(Purchase $purchase): WhatsAppReply|string

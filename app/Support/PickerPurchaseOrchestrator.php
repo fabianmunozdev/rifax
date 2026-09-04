@@ -87,7 +87,9 @@ final class PickerPurchaseOrchestrator
             'consumed_by_customer_id' => $customer->id,
         ])->save();
 
-        $body = self::renderReservationConfirmationBody($purchase);
+        $redirect = self::buildConfirmedRedirectUrl($raffle, $numbers, $purchase, false);
+        $rendered = self::renderReservationConfirmationBody($purchase, $redirect['redirect_url'] ?? null);
+        $body = is_array($rendered) ? (string) ($rendered['body'] ?? $rendered[0] ?? '') : (string) $rendered;
         $buttons = [
             ['id' => 'cancel_purchase', 'title' => 'Cancelar'],
             ['id' => 'payment_menu', 'title' => 'Menú'],
@@ -102,6 +104,40 @@ final class PickerPurchaseOrchestrator
             'outbound_sent' => $outbound['sent'],
             'outbound_status' => $outbound['status'],
             'outbound_error' => $outbound['error'],
+        ];
+    }
+
+    /**
+     * @param  list<string>  $numbers
+     * @return array{redirect_url:string}
+     */
+    public static function buildConfirmedRedirectUrl(Raffle $raffle, array $numbers, ?Purchase $purchase, bool $requiresOnboarding): array
+    {
+        $params = [
+            'numbers' => array_values(array_map('strval', $numbers)),
+            'requires_onboarding' => $requiresOnboarding ? '1' : '0',
+        ];
+
+        if ($purchase instanceof Purchase && $purchase->exists) {
+            $params['amount'] = (string) $purchase->total_amount;
+            $params['unit'] = (string) $purchase->unit_price;
+            if ($purchase->reserved_until !== null) {
+                try {
+                    $until = $purchase->reserved_until->tz('America/Bogota');
+                    $params['until'] = $until->toIso8601String();
+                } catch (\Throwable) {
+                    $params['until'] = $purchase->reserved_until->toIso8601String();
+                }
+            }
+            $params['ref'] = 'PUR-'.$purchase->id;
+        }
+
+        return [
+            'redirect_url' => \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                'raffles.number-picker.confirmed',
+                now()->addMinutes(60),
+                array_merge(['raffle' => $raffle->slug], $params)
+            ),
         ];
     }
 
@@ -207,7 +243,10 @@ final class PickerPurchaseOrchestrator
         }
     }
 
-    public static function renderReservationConfirmationBody(Purchase $purchase): string
+    /**
+     * @return array{body:string, footer_line:string}|string
+     */
+    public static function renderReservationConfirmationBody(Purchase $purchase, ?string $confirmedUrl = null): array|string
     {
         $purchase->loadMissing(['numbers.raffleNumber', 'raffle']);
         $reservedNumbers = collect($purchase->numbers ?? [])->pluck('number')->implode(', ');
@@ -226,15 +265,33 @@ final class PickerPurchaseOrchestrator
                 .$paymentInstructions;
         }
 
-        return $message.PHP_EOL.PHP_EOL
+        $footerLine = '';
+        if (is_string($confirmedUrl) && $confirmedUrl !== '') {
+            $footerLine = '⏱️ Mira el tiempo restante en vivo y continúa el proceso aquí:'.$confirmedUrl;
+        }
+
+        $body = $message.PHP_EOL.PHP_EOL
             .'Después de pagar, envía una foto clara del comprobante por este chat para continuar.';
+
+        if ($footerLine !== '') {
+            $body .= PHP_EOL.PHP_EOL.$footerLine;
+        }
+
+        return [
+            'body' => $body,
+            'footer_line' => $footerLine,
+        ];
     }
 
     public static function renderReservationWindowMessage(Purchase $purchase): string
     {
+        $now = now();
         $minutes = $purchase->raffle?->reservation_timeout_minutes;
         if (! is_int($minutes) || $minutes < 1) {
-            $minutes = $purchase->reserved_until?->diffInMinutes(now());
+            if ($purchase->reserved_until !== null) {
+                $diffMinutes = (int) ceil(max(0, $purchase->reserved_until->diffInRealMinutes($now, true)));
+                $minutes = $diffMinutes >= 1 ? $diffMinutes : null;
+            }
         }
         if (! is_int($minutes) || $minutes < 1) {
             return 'Tu reserva quedará activa por tiempo limitado.';
