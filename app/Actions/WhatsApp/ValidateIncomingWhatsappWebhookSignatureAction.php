@@ -47,11 +47,20 @@ class ValidateIncomingWhatsappWebhookSignatureAction
 
     protected function logRejectedAttempt(Request $request, string $header, string $reason): void
     {
+        $signatureHeader = (string) $request->header($header, '');
+        $rawContent = (string) $request->getContent();
+        $snippet = mb_substr($rawContent, 0, 1500);
+
         Log::warning('Rejected WhatsApp webhook request due to invalid signature.', [
             'reason' => $reason,
             'expected_header' => $header,
+            'provided_header_value' => $signatureHeader,
             'ip' => $request->ip(),
             'user_agent' => $request->userAgent(),
+            'content_length' => strlen($rawContent),
+            'content_snippet' => $snippet === '' ? null : $snippet,
+            'content_hash_sha256' => $rawContent === '' ? null : hash('sha256', $rawContent),
+            'query' => $request->query(),
         ]);
 
         $cacheKey = 'whatsapp-webhook:signature-rejected:'.$request->ip().':'.$reason;

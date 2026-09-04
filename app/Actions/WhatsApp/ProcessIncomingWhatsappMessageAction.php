@@ -124,15 +124,20 @@ class ProcessIncomingWhatsappMessageAction
     {
         $waIdRaw = (string) (Arr::get($contacts, '0.wa_id') ?: Arr::get($message, 'from'));
         $fromRaw = (string) Arr::get($message, 'from');
+        $fromUserIdRaw = (string) Arr::get($message, 'from_user_id');
         $waDigits = (string) preg_replace('/\D+/', '', $waIdRaw);
         if ($waDigits === '') {
             $waDigits = (string) preg_replace('/\D+/', '', $fromRaw);
         }
 
+        if ($waDigits === '') {
+            $waDigits = (string) preg_replace('/\D+/', '', $fromUserIdRaw);
+        }
+
         if ($waDigits === '' || strlen($waDigits) < 7) {
             throw new InvalidArgumentException(
                 'No se pudo obtener un número de teléfono válido desde el mensaje. waIdRaw='
-                .$waIdRaw.' fromRaw='.$fromRaw,
+                .$waIdRaw.' fromRaw='.$fromRaw.' fromUserIdRaw='.$fromUserIdRaw,
             );
         }
 
