@@ -41,7 +41,7 @@ class Customer extends Model
 
     public function setWaIdAttribute(mixed $value): void
     {
-        $digits = (string) preg_replace('/\D+/', '', (string) $value;
+        $digits = (string) preg_replace('/\D+/', '', (string) $value);
         $this->attributes['wa_id'] = $digits === '' ? null : $digits;
     }
 
