@@ -88,10 +88,9 @@ final class PickerPurchaseOrchestrator
         ])->save();
 
         $redirect = self::buildConfirmedRedirectUrl($raffle, $numbers, $purchase, false);
-        $rendered = self::renderReservationConfirmationBody($purchase, $redirect['redirect_url'] ?? null);
+        $rendered = self::renderReservationConfirmationBody($purchase);
         $body = is_array($rendered) ? (string) ($rendered['body'] ?? $rendered[0] ?? '') : (string) $rendered;
         $buttons = [
-            ['id' => 'cancel_purchase', 'title' => 'Cancelar'],
             ['id' => 'payment_menu', 'title' => 'Menú'],
         ];
 
@@ -244,9 +243,9 @@ final class PickerPurchaseOrchestrator
     }
 
     /**
-     * @return array{body:string, footer_line:string}|string
+     * @return string
      */
-    public static function renderReservationConfirmationBody(Purchase $purchase, ?string $confirmedUrl = null): array|string
+    public static function renderReservationConfirmationBody(Purchase $purchase): string
     {
         $purchase->loadMissing(['numbers.raffleNumber', 'raffle']);
         $reservedNumbers = collect($purchase->numbers ?? [])->pluck('number')->implode(', ');
@@ -265,22 +264,8 @@ final class PickerPurchaseOrchestrator
                 .$paymentInstructions;
         }
 
-        $footerLine = '';
-        if (is_string($confirmedUrl) && $confirmedUrl !== '') {
-            $footerLine = '⏱️ Mira el tiempo restante en vivo y continúa el proceso aquí:'.$confirmedUrl;
-        }
-
-        $body = $message.PHP_EOL.PHP_EOL
+        return $message.PHP_EOL.PHP_EOL
             .'Después de pagar, envía una foto clara del comprobante por este chat para continuar.';
-
-        if ($footerLine !== '') {
-            $body .= PHP_EOL.PHP_EOL.$footerLine;
-        }
-
-        return [
-            'body' => $body,
-            'footer_line' => $footerLine,
-        ];
     }
 
     public static function renderReservationWindowMessage(Purchase $purchase): string

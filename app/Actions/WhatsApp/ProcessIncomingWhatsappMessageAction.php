@@ -383,11 +383,29 @@ class ProcessIncomingWhatsappMessageAction
         }
 
         if ($this->isCancelCommand($normText)) {
-            $result = $this->cancelPurchaseFlowAction->execute($state);
+            $activePurchase = $state->purchase;
+            $hasActiveReservedPurchase = $activePurchase instanceof Purchase
+                && in_array($activePurchase->status, ['reserved', 'rejected'], true);
 
-            return $result['cancelled']
-                ? 'Proceso cancelado y reserva liberada correctamente.'.PHP_EOL.PHP_EOL.$this->renderMainMenu()
-                : 'Proceso cancelado.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+            if ($hasActiveReservedPurchase) {
+                return (function () use ($state, $activePurchase): string {
+                    $minutes = $activePurchase->raffle?->reservation_timeout_minutes;
+                    if (! is_int($minutes) || $minutes < 1) {
+                        $minutes = $activePurchase->reserved_until?->diffInRealMinutes(now()) ?? 0;
+                    }
+                    $minuteLabel = $minutes === 1 ? 'minuto' : 'minutos';
+                    $hint = $minutes > 0
+                        ? "Tu reserva actual se mantiene por {$minutes} {$minuteLabel} más. Si completas el pago y envías el comprobante en este plazo, conservas tus números."
+                        : 'Los números se liberarán en cualquier momento si no completas el pago.';
+
+                    return 'Para evitar que pierdas tu reserva por error, este chat no puede cancelarla automáticamente.'.PHP_EOL.PHP_EOL
+                        .$hint.PHP_EOL.PHP_EOL
+                        .'Si necesitas ayuda, escribe AYUDA y te atendemos personalmente. Para volver al listado principal escribe MENU.';
+                })();
+            }
+
+            return 'Actualmente no tienes una reserva activa en curso.'.PHP_EOL.PHP_EOL
+                .'Para volver al menú principal escribe MENU.';
         }
 
         if ($inboundMessage->message_type === 'image' && ! in_array($state->status, ['purchase_payment_instructions', 'purchase_rejected', 'purchase_under_review'], true)) {
@@ -597,9 +615,7 @@ class ProcessIncomingWhatsappMessageAction
             return 'No pudimos reservar los números aleatorios en este momento. Intenta nuevamente.';
         }
 
-        $redirect = $this->buildConfirmedRedirectUrl($raffle, $numbers, $purchase, false);
-
-        return $this->renderReservationConfirmation($purchase, $redirect['redirect_url'] ?? null);
+        return $this->renderReservationConfirmation($purchase);
     }
 
     protected function handlePurchaseSelectNumbers(Customer $customer, ConversationState $state, string $text): WhatsAppReply|string
@@ -631,9 +647,7 @@ class ProcessIncomingWhatsappMessageAction
             return 'Uno o más números no están disponibles. Puedes elegir otros números o escribir MENU.';
         }
 
-        $redirect = $this->buildConfirmedRedirectUrl($raffle, $numbers, $purchase, false);
-
-        return $this->renderReservationConfirmation($purchase, $redirect['redirect_url'] ?? null);
+        return $this->renderReservationConfirmation($purchase);
     }
 
     protected function handlePaymentProofStep(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage): WhatsAppReply|string
@@ -833,9 +847,7 @@ class ProcessIncomingWhatsappMessageAction
             'consumed_by_customer_id' => $customer->id,
         ])->save();
 
-        $redirect = $this->buildConfirmedRedirectUrl($raffle, $numbers, $purchase, false);
-
-        return $this->renderReservationConfirmation($purchase, $redirect['redirect_url'] ?? null);
+        return $this->renderReservationConfirmation($purchase);
     }
 
     protected function shouldReenterClosedPurchaseFlow(ConversationState $state, string $text): bool
@@ -1319,7 +1331,7 @@ class ProcessIncomingWhatsappMessageAction
             ->implode(',');
     }
 
-    protected function renderReservationConfirmation(Purchase $purchase, ?string $confirmedUrl = null): WhatsAppReply|string
+    protected function renderReservationConfirmation(Purchase $purchase): WhatsAppReply|string
     {
         $reservedNumbers = $purchase->numbers->pluck('number')->implode(', ');
         $paymentInstructions = $this->renderPaymentInstructionsList($purchase);
@@ -1338,12 +1350,7 @@ class ProcessIncomingWhatsappMessageAction
         $body = $message.PHP_EOL.PHP_EOL
             .'Después de pagar, envía una foto clara del comprobante por este chat para continuar.';
 
-        if (is_string($confirmedUrl) && $confirmedUrl !== '') {
-            $body .= PHP_EOL.PHP_EOL.'⏱️ Mira el tiempo restante en vivo y continúa el proceso aquí:'.$confirmedUrl;
-        }
-
         return WhatsAppReply::make($body, [
-            ['id' => 'cancel_purchase', 'title' => 'Cancelar'],
             ['id' => 'payment_menu', 'title' => 'Menú'],
         ]);
     }
@@ -1418,7 +1425,6 @@ class ProcessIncomingWhatsappMessageAction
             })();
 
         return WhatsAppReply::make($body, [
-            ['id' => 'cancel_purchase', 'title' => 'Cancelar'],
             ['id' => 'payment_help', 'title' => 'Ayuda'],
             ['id' => 'payment_menu', 'title' => 'Menú'],
         ]);
