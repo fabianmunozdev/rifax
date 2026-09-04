@@ -3,25 +3,32 @@
 namespace App\Http\Controllers;
 
 use App\Models\CompanySetting;
+use App\Models\Customer;
+use App\Models\Purchase;
 use App\Models\Raffle;
 use App\Models\RafflePickerIntent;
+use App\Support\PickerAuthToken;
+use App\Support\PickerPurchaseOrchestrator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 class RaffleNumberPickerController extends Controller
 {
     protected const NUMBER_PICKER_PAGE_SIZE = 240;
 
-    public function show(Raffle $raffle): View
+    public function show(Request $request, Raffle $raffle): View
     {
         abort_unless($raffle->salesAreOpen(), 404);
 
-        $trace = $this->resolvePickerTrace(request());
-        $quantity = max($raffle->min_numbers_per_purchase, (int) request()->integer('quantity', $raffle->min_numbers_per_purchase));
+        $trace = $this->resolvePickerTrace($request);
+        $quantity = max($raffle->min_numbers_per_purchase, (int) $request->integer('quantity', $raffle->min_numbers_per_purchase));
         $company = CompanySetting::query()->first();
         $botPhone = $company?->whatsapp_bot_phone;
         $catalogCount = $raffle->numbers()->count();
@@ -29,6 +36,29 @@ class RaffleNumberPickerController extends Controller
             ->where('status', 'available')
             ->count();
         $initialChunk = $this->fetchNumberChunk($raffle);
+
+        $pickerTokenRaw = (string) $request->query('pt', '');
+        $pickerCustomer = null;
+        $pickerAuthError = null;
+        if ($pickerTokenRaw !== '') {
+            $pickerCustomer = PickerAuthToken::verify($pickerTokenRaw);
+            if (! $pickerCustomer instanceof Customer) {
+                $pickerAuthError = 'Enlace de confirmación inválido o expirado. Para confirmar tu selección sin escribir al bot, usa el enlace fresco que te enviamos por WhatsApp. Si no lo tienes, puedes continuar abriendo WhatsApp manualmente.';
+            }
+        }
+
+        $confirmUrl = $pickerCustomer instanceof Customer
+            ? route('raffles.number-picker.confirm', array_filter([
+                'raffle' => $raffle->slug,
+                'pt' => $pickerTokenRaw,
+                'source' => $trace['source'],
+                'utm_source' => $trace['utm_source'],
+                'utm_medium' => $trace['utm_medium'],
+                'utm_campaign' => $trace['utm_campaign'],
+                'utm_content' => $trace['utm_content'],
+                'utm_term' => $trace['utm_term'],
+            ], fn (mixed $value): bool => $value !== null && $value !== ''))
+            : null;
 
         return view('raffles.number-picker', [
             'raffle' => $raffle,
@@ -53,6 +83,9 @@ class RaffleNumberPickerController extends Controller
                 'utm_content' => $trace['utm_content'],
                 'utm_term' => $trace['utm_term'],
             ], fn (mixed $value): bool => $value !== null && $value !== '')),
+            'pickerConfirmUrl' => $confirmUrl,
+            'pickerAuthCustomer' => $pickerCustomer,
+            'pickerAuthError' => $pickerAuthError,
             'pickerTrace' => $trace,
         ]);
     }
@@ -179,6 +212,191 @@ class RaffleNumberPickerController extends Controller
             'whatsapp_message' => $this->buildPickerWhatsappMessage($raffle, $intent),
             'expires_at' => $intent->expires_at?->toIso8601String(),
         ]);
+    }
+
+    public function confirm(Request $request, Raffle $raffle): JsonResponse
+    {
+        $throttleKey = 'picker-confirm|ip:'.$request->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 8)) {
+            return response()->json([
+                'message' => 'Estamos procesando muchas solicitudes. Intenta nuevamente en 60 segundos.',
+                'retry_after' => RateLimiter::availableIn($throttleKey),
+            ], 429);
+        }
+        RateLimiter::hit($throttleKey, 60);
+
+        if (! $raffle->salesAreOpen()) {
+            return response()->json([
+                'message' => 'Esta rifa ya cerro ventas porque alcanzo la hora programada del sorteo.',
+            ], 422);
+        }
+
+        $pickerTokenRaw = (string) $request->query('pt', '');
+        if ($pickerTokenRaw === '') {
+            $pickerTokenRaw = (string) $request->input('pt', '');
+        }
+
+        $customer = $pickerTokenRaw !== '' ? PickerAuthToken::verify($pickerTokenRaw) : null;
+        if (! $customer instanceof Customer) {
+            return response()->json([
+                'message' => 'El enlace de confirmación es inválido o ya expiró. Por favor vuelve al chat de WhatsApp y usa el enlace más reciente.',
+                'fallback_legacy' => true,
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'quantity' => ['required', 'integer', 'min:1'],
+            'selected_numbers' => ['required', 'array', 'min:1'],
+            'selected_numbers.*' => ['required', 'string'],
+            'trace' => ['nullable', 'array'],
+            'trace.source' => ['nullable', 'string', 'max:100'],
+            'trace.referrer_url' => ['nullable', 'string', 'max:2048'],
+            'trace.picker_page_url' => ['nullable', 'string', 'max:2048'],
+            'trace.utm_source' => ['nullable', 'string', 'max:255'],
+            'trace.utm_medium' => ['nullable', 'string', 'max:255'],
+            'trace.utm_campaign' => ['nullable', 'string', 'max:255'],
+            'trace.utm_content' => ['nullable', 'string', 'max:255'],
+            'trace.utm_term' => ['nullable', 'string', 'max:255'],
+            'intent_token' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        $quantity = max($raffle->min_numbers_per_purchase, (int) $validated['quantity']);
+        $digits = $raffle->normalizedNumberDigits();
+        $selectedNumbers = collect($validated['selected_numbers'])
+            ->map(fn (string $n): string => trim($n))
+            ->filter()
+            ->values();
+
+        if ($selectedNumbers->count() !== $quantity) {
+            return response()->json([
+                'message' => "Debes seleccionar exactamente {$quantity} número(s) para continuar.",
+            ], 422);
+        }
+
+        $invalidNumbers = $selectedNumbers
+            ->filter(fn (string $n): bool => ! ctype_digit($n) || strlen($n) !== $digits)
+            ->values()
+            ->all();
+        if ($invalidNumbers !== []) {
+            return response()->json([
+                'message' => "La seleccion contiene numeros invalidos. Cada numero debe tener exactamente {$digits} cifra(s).",
+            ], 422);
+        }
+        if ($selectedNumbers->unique()->count() !== $selectedNumbers->count()) {
+            return response()->json([
+                'message' => 'No puedes repetir numeros en la misma seleccion.',
+            ], 422);
+        }
+
+        $raffleNumbers = $raffle->numbers()
+            ->whereIn('number', $selectedNumbers->all())
+            ->get(['number', 'status'])
+            ->keyBy('number');
+        if ($raffleNumbers->count() !== $selectedNumbers->count()) {
+            return response()->json([
+                'message' => 'Uno o mas numeros ya no existen en el catalogo de esta rifa.',
+            ], 422);
+        }
+
+        $unavailableNumbers = $raffleNumbers
+            ->filter(fn ($r): bool => $r->status !== 'available')
+            ->keys()
+            ->values()
+            ->all();
+        if ($unavailableNumbers !== []) {
+            return response()->json([
+                'message' => 'Uno o mas numeros ya no estan disponibles. Actualiza la pagina y elige nuevamente.',
+            ], 422);
+        }
+
+        $trace = $this->resolvePickerTrace($request, Arr::get($validated, 'trace', []));
+
+        try {
+            DB::beginTransaction();
+
+            $intent = RafflePickerIntent::query()->create([
+                'raffle_id' => $raffle->id,
+                'token' => isset($validated['intent_token']) && is_string($validated['intent_token']) && $validated['intent_token'] !== ''
+                    ? $validated['intent_token']
+                    : $this->generateUniqueIntentToken(),
+                'quantity' => $quantity,
+                'source' => $trace['source'],
+                'selected_numbers_json' => $selectedNumbers->all(),
+                'metadata_json' => $this->formatPickerIntentMetadata($trace),
+                'expires_at' => now()->addMinutes(10),
+            ]);
+
+            $result = PickerPurchaseOrchestrator::confirmFromIntent(
+                customer: $customer,
+                raffle: $raffle,
+                intent: $intent,
+                numbers: $selectedNumbers->all(),
+            );
+
+            DB::commit();
+        } catch (InvalidArgumentException $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'fallback_legacy' => true,
+            ], 422);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            report($e);
+
+            return response()->json([
+                'message' => 'No pudimos confirmar tu reserva en este momento. Intenta nuevamente, o usa el botón para abrir WhatsApp y confirmar manualmente.',
+                'fallback_legacy' => true,
+                'debug' => app()->hasDebugModeEnabled() ? $e->getMessage() : null,
+            ], 500);
+        }
+
+        /** @var Purchase|null $purchase */
+        $purchase = $result['purchase'] ?? null;
+        $requiresOnboarding = (bool) ($result['requires_onboarding'] ?? false);
+        $onboardingStatus = (string) ($result['onboarding_status'] ?? '');
+
+        if ($requiresOnboarding) {
+            return response()->json([
+                'ok' => true,
+                'requires_onboarding' => true,
+                'onboarding_status' => $onboardingStatus,
+                'outbound_sent' => (bool) ($result['outbound_sent'] ?? false),
+                'outbound_status' => (string) ($result['outbound_status'] ?? ''),
+                'message' => 'Para finalizar tu reserva necesitamos que completes unos datos rápidos por WhatsApp. Revisa tu chat, ya te enviamos las instrucciones.',
+            ], 200);
+        }
+
+        if (! $purchase instanceof Purchase || ! $purchase->exists) {
+            return response()->json([
+                'message' => 'No pudimos confirmar tu reserva en este momento. Intenta nuevamente, o usa el botón para abrir WhatsApp y confirmar manualmente.',
+                'fallback_legacy' => true,
+            ], 500);
+        }
+
+        $outboundSent = (bool) ($result['outbound_sent'] ?? false);
+        $outboundError = isset($result['outbound_error']) && is_string($result['outbound_error']) ? $result['outbound_error'] : null;
+
+        $body = [
+            'ok' => true,
+            'purchase_id' => $purchase->id,
+            'reservation_id' => $purchase->reservation_id,
+            'reserved_numbers' => $selectedNumbers->all(),
+            'total_amount' => $purchase->total_amount,
+            'reserved_until' => $purchase->reserved_until?->toIso8601String(),
+            'outbound_sent' => $outboundSent,
+            'outbound_status' => (string) ($result['outbound_status'] ?? ''),
+            'fallback_legacy' => ! $outboundSent,
+            'message' => $outboundSent
+                ? '¡Reserva confirmada! Revisa tu WhatsApp, ya te enviamos la confirmación y los datos de pago.'
+                : 'Tu reserva fue creada correctamente, pero no pudimos enviarte el mensaje por WhatsApp en este momento. Por favor usa el botón para continuar el proceso por WhatsApp.',
+        ];
+        if ($outboundError !== null && $outboundError !== '') {
+            $body['outbound_error'] = $outboundError;
+        }
+
+        return response()->json($body, 200);
     }
 
     protected function normalizePhoneDigits(?string $phone): ?string

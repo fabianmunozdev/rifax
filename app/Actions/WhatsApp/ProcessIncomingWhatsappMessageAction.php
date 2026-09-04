@@ -14,6 +14,7 @@ use App\Models\Purchase;
 use App\Models\Raffle;
 use App\Models\RafflePickerIntent;
 use App\Models\WhatsappMessage;
+use App\Support\PickerAuthToken;
 use App\Support\WhatsAppReply;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -130,6 +131,31 @@ class ProcessIncomingWhatsappMessageAction
             $waDigits = (string) preg_replace('/\D+/', '', $fromRaw);
         }
 
+        $phoneFromWa = null;
+        if ($waDigits !== '' && strlen($waDigits) <= 15) {
+            $phoneFromWa = Customer::normalizePhone($waDigits);
+        }
+
+        if ($waDigits === '' || strlen($waDigits) < 7) {
+            $userIdWaDigits = null;
+            if (str_contains($fromUserIdRaw, '.')) {
+                $userIdAfterDot = (string) substr($fromUserIdRaw, (int) strpos($fromUserIdRaw, '.') + 1);
+                $d = (string) preg_replace('/\D+/', '', $userIdAfterDot);
+                if (strlen($d) >= 7) {
+                    $userIdWaDigits = $d;
+                }
+            }
+            if ($userIdWaDigits === null) {
+                $d = (string) preg_replace('/\D+/', '', $fromUserIdRaw);
+                if (strlen($d) >= 7) {
+                    $userIdWaDigits = $d;
+                }
+            }
+            if ($userIdWaDigits !== null) {
+                $waDigits = $userIdWaDigits;
+            }
+        }
+
         if ($waDigits === '' || strlen($waDigits) < 7) {
             throw new InvalidArgumentException(
                 'No se pudo obtener un número de teléfono válido desde el mensaje. waIdRaw='
@@ -137,24 +163,34 @@ class ProcessIncomingWhatsappMessageAction
             );
         }
 
-        $phone = Customer::normalizePhone($waDigits);
-        if ($phone === null) {
-            throw new InvalidArgumentException(
-                'No se pudo normalizar el número del mensaje. waDigits='.$waDigits,
-            );
+        $waDigitsLen = strlen($waDigits);
+        if ($phoneFromWa === null && $waDigitsLen <= 15) {
+            $phoneFromWa = Customer::normalizePhone($waDigits);
         }
 
         $name = trim((string) Arr::get($contacts, '0.profile.name', ''));
 
-        $customer = Customer::query()->firstOrNew([
-            'phone' => $phone,
-        ]);
+        if ($phoneFromWa !== null) {
+            $customer = Customer::query()->firstOrNew([
+                'phone' => $phoneFromWa,
+            ]);
+        } else {
+            $customer = Customer::query()->firstOrNew([
+                'wa_id' => $waDigits,
+            ]);
+            if ($customer->exists && $customer->phone === null && $phoneFromWa !== null) {
+                $customer->phone = $phoneFromWa;
+            }
+        }
 
         if ($name !== '') {
             $customer->name = $name;
         }
 
         $customer->wa_id = $waDigits;
+        if ($phoneFromWa !== null && $customer->phone === null) {
+            $customer->phone = $phoneFromWa;
+        }
         $customer->last_interaction_at = now();
         $customer->save();
 
@@ -537,7 +573,7 @@ class ProcessIncomingWhatsappMessageAction
                 return $this->renderMainMenu();
             }
 
-            return $this->renderNumberSelectionPrompt($raffle, (int) $state->requested_quantity);
+            return $this->renderNumberSelectionPrompt($raffle, (int) $state->requested_quantity, $state->customer);
         }
 
         $raffle = $this->getConversationRaffle($state);
@@ -1248,13 +1284,21 @@ class ProcessIncomingWhatsappMessageAction
         ]);
     }
 
-    protected function renderNumberSelectionPrompt(Raffle $raffle, int $quantity): WhatsAppReply|string
+    protected function renderNumberSelectionPrompt(Raffle $raffle, int $quantity, ?Customer $customer = null): WhatsAppReply|string
     {
-        $pickerUrl = route('raffles.number-picker', [
+        $query = [
             'raffle' => $raffle->slug,
             'quantity' => $quantity,
             'source' => 'whatsapp_manual_prompt',
-        ]);
+        ];
+        if ($customer instanceof Customer && ($customer->phone !== null || $customer->wa_id !== null)) {
+            try {
+                $query['pt'] = PickerAuthToken::generate($customer);
+            } catch (\Throwable) {
+                unset($query['pt']);
+            }
+        }
+        $pickerUrl = route('raffles.number-picker', $query);
 
         return 'Escoge aquí tus números:'.PHP_EOL.$pickerUrl;
     }

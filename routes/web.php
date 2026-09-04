@@ -21,6 +21,8 @@ Route::get('/raffles/{raffle:slug}/number-picker/numbers', [RaffleNumberPickerCo
     ->name('raffles.number-picker.numbers');
 Route::post('/raffles/{raffle:slug}/number-picker/intents', [RaffleNumberPickerController::class, 'store'])
     ->name('raffles.number-picker.intents');
+Route::post('/raffles/{raffle:slug}/number-picker/confirm', [RaffleNumberPickerController::class, 'confirm'])
+    ->name('raffles.number-picker.confirm');
 
 Route::get('/', PublicLandingController::class)
     ->name('landing');

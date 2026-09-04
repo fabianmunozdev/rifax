@@ -382,6 +382,47 @@
             color: var(--danger);
             font-weight: 600;
         }
+        .auth-banner {
+            border-radius: 14px;
+            padding: 14px 16px;
+            border: 1px solid transparent;
+            display: grid;
+            gap: 6px;
+        }
+        .auth-banner--ok {
+            background: rgba(14, 165, 233, 0.12);
+            border-color: rgba(14, 165, 233, 0.35);
+            color: rgba(255, 255, 255, 0.92);
+        }
+        .auth-banner--warn {
+            background: rgba(234, 179, 8, 0.14);
+            border-color: rgba(234, 179, 8, 0.4);
+            color: rgba(255, 255, 255, 0.92);
+        }
+        .auth-banner__title {
+            font-size: 14px;
+            font-weight: 700;
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: baseline;
+        }
+        .auth-banner__phone {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.78);
+            font-weight: 600;
+        }
+        .auth-banner__body {
+            font-size: 13px;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        .auth-banner__hint {
+            display: inline-block;
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+        }
         .section-stack {
             display: grid;
             gap: 18px;
@@ -457,6 +498,36 @@
                 </div>
             </div>
 
+            @if (isset($pickerAuthCustomer) && $pickerAuthCustomer instanceof \App\Models\Customer)
+                @php
+                    $phoneRaw = (string) ($pickerAuthCustomer->phone ?? '');
+                    $phoneDigits = preg_replace('/\D+/', '', $phoneRaw) ?: '';
+                    $phoneMask = $phoneDigits !== ''
+                        ? '+'.substr($phoneDigits, 0, 2).' '.substr($phoneDigits, 2, 3).'***'.substr($phoneDigits, -4)
+                        : '';
+                @endphp
+                <div class="auth-banner auth-banner--ok" role="status">
+                    <div class="auth-banner__title">
+                        Confirmando como <strong>{{ $pickerAuthCustomer->name ?: 'Cliente' }}</strong>
+                        @if ($phoneMask !== '')
+                            <span class="auth-banner__phone">({{ $phoneMask }})</span>
+                        @endif
+                    </div>
+                    <div class="auth-banner__body">
+                        Tu selección se reservará automáticamente y recibirás la confirmación y los datos de pago directamente por este WhatsApp.
+                        <br>
+                        <span class="auth-banner__hint">Si no eres esta persona, cierra esta ventana y escribe HOLA al bot para generar tu enlace personalizado.</span>
+                    </div>
+                </div>
+            @elseif (isset($pickerAuthError) && is_string($pickerAuthError) && $pickerAuthError !== '')
+                <div class="auth-banner auth-banner--warn" role="alert">
+                    <div class="auth-banner__title">Enlace de confirmación inválido o expirado</div>
+                    <div class="auth-banner__body">
+                        {{ $pickerAuthError }}
+                    </div>
+                </div>
+            @endif
+
             @if (! $botPhoneDigits)
                 <p class="warning">No hay un número de WhatsApp del bot configurado en administración. Configura `whatsapp_bot_phone` para habilitar el flujo web hacia WhatsApp.</p>
             @endif
@@ -517,17 +588,20 @@
                                 aria-disabled="true"
                                 data-phone="{{ $botPhoneDigits }}"
                                 data-intent-url="{{ $pickerIntentUrl }}"
+                                data-confirm-url="{{ $pickerConfirmUrl ?? '' }}"
                                 data-picker-trace='@json($pickerTrace)'
                             >
                                 <svg class="cta-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
                                     <path d="M19.05 4.91A9.82 9.82 0 0 0 12.03 2C6.57 2 2.12 6.42 2.12 11.88c0 1.75.46 3.46 1.34 4.97L2 22l5.3-1.39a9.9 9.9 0 0 0 4.73 1.21h.01c5.46 0 9.88-4.42 9.88-9.88a9.8 9.8 0 0 0-2.87-7.03Zm-7.02 15.24h-.01a8.2 8.2 0 0 1-4.18-1.14l-.3-.18-3.15.83.84-3.07-.2-.32a8.16 8.16 0 0 1-1.25-4.38c0-4.5 3.67-8.16 8.19-8.16a8.1 8.1 0 0 1 5.78 2.4 8.12 8.12 0 0 1 2.38 5.78c0 4.51-3.67 8.17-8.1 8.24Zm4.48-6.13c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.01-.37-1.92-1.19-.71-.63-1.19-1.4-1.33-1.64-.14-.24-.02-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.31-.74-1.8-.2-.47-.4-.4-.54-.4h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.68 2.56 4.07 3.59.57.25 1.01.4 1.36.52.57.18 1.08.15 1.48.09.45-.07 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z"/>
                                 </svg>
-                                <span>Continuar compra por WhatsApp</span>
+                                <span class="cta-label">{{ ($pickerConfirmUrl ?? '') !== '' ? 'Confirmar selección y reservar' : 'Continuar compra por WhatsApp' }}</span>
                             </a>
                         </div>
                         <div class="actions-foot">
-                            <div class="cta-help">
-                                Se abrira un mensaje listo para enviar. No necesitas editarlo.
+                            <div class="cta-help" id="cta-help-text">
+                                {{ ($pickerConfirmUrl ?? '') !== ''
+                                    ? 'Confirma tus números y la reserva se crea automáticamente. Recibirás todo por WhatsApp.'
+                                    : 'Se abrirá un mensaje de WhatsApp listo para enviar. No necesitas editarlo.' }}
                             </div>
                             <div class="feedback" id="selection-feedback" aria-live="polite"></div>
                         </div>
@@ -698,10 +772,18 @@
                     : 'Aún no has seleccionado números.';
 
                 const phone = link.dataset.phone || '';
-                const isReady = !isSubmitting && phone !== '' && count === requiredQuantity;
+                const confirmUrl = link.dataset.confirmUrl || '';
+                const hasConfirm = confirmUrl !== '';
+                const isReady = !isSubmitting && (hasConfirm || phone !== '') && count === requiredQuantity;
 
                 link.setAttribute('aria-disabled', isReady ? 'false' : 'true');
-                link.innerHTML = isSubmitting ? 'Preparando WhatsApp...' : defaultCtaHtml;
+                if (isSubmitting) {
+                    link.innerHTML = hasConfirm
+                        ? '<svg class="cta-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" opacity=".25"/><path d="M21 12a9 9 0 0 0-9-9"/></svg><span class="cta-label">Reservando selección...</span>'
+                        : '<svg class="cta-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" opacity=".25"/><path d="M21 12a9 9 0 0 0-9-9"/></svg><span class="cta-label">Preparando WhatsApp...</span>';
+                } else {
+                    link.innerHTML = defaultCtaHtml;
+                }
                 link.href = '#';
             };
 
@@ -761,9 +843,14 @@
 
                 const phone = link.dataset.phone || '';
                 const intentUrl = link.dataset.intentUrl || '';
+                const confirmUrl = link.dataset.confirmUrl || '';
+                const hasConfirm = confirmUrl !== '';
                 const selectedNumbers = Array.from(selected).sort();
 
-                if (phone === '' || intentUrl === '' || selectedNumbers.length !== requiredQuantity) {
+                if (selectedNumbers.length !== requiredQuantity) {
+                    return;
+                }
+                if (!hasConfirm && (phone === '' || intentUrl === '')) {
                     return;
                 }
 
@@ -772,6 +859,66 @@
                 sync();
 
                 try {
+                    if (hasConfirm) {
+                        const response = await fetch(confirmUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                            body: JSON.stringify({
+                                quantity: requiredQuantity,
+                                selected_numbers: selectedNumbers,
+                                trace: pickerTrace,
+                            }),
+                        });
+
+                        const payload = await response.json();
+
+                        if (response.ok && payload?.ok === true) {
+                            setFeedback(
+                                '¡Listo! Tu reserva se creó exitosamente. Revisa tu WhatsApp para continuar con el pago.',
+                                false
+                            );
+                            link.innerHTML = defaultCtaHtml;
+                            link.setAttribute('aria-disabled', 'true');
+                            isSubmitting = false;
+                            return;
+                        }
+
+                        const fallbackLegacy = Boolean(payload?.fallback_legacy ?? false);
+                        const fallbackMessage = payload?.message
+                            || 'No pudimos confirmar tu selección. Intenta nuevamente.';
+
+                        if (fallbackLegacy && phone !== '' && intentUrl !== '') {
+                            const intentResp = await fetch(intentUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken,
+                                },
+                                body: JSON.stringify({
+                                    quantity: requiredQuantity,
+                                    selected_numbers: selectedNumbers,
+                                    trace: pickerTrace,
+                                }),
+                            });
+                            const intentPayload = await intentResp.json();
+                            if (!intentResp.ok) {
+                                throw new Error(intentPayload.message || fallbackMessage);
+                            }
+                            const whatsappMessage = encodeURIComponent(
+                                intentPayload.whatsapp_message || `PICKER ${intentPayload.token}`
+                            );
+                            window.location.href = `https://wa.me/${phone}?text=${whatsappMessage}`;
+                            return;
+                        }
+
+                        throw new Error(fallbackMessage);
+                    }
+
                     const response = await fetch(intentUrl, {
                         method: 'POST',
                         headers: {
@@ -795,7 +942,7 @@
                     const whatsappMessage = encodeURIComponent(payload.whatsapp_message || `PICKER ${payload.token}`);
                     window.location.href = `https://wa.me/${phone}?text=${whatsappMessage}`;
                 } catch (error) {
-                    setFeedback(error instanceof Error ? error.message : 'No pudimos preparar tu selección. Intenta nuevamente.', true);
+                    setFeedback(error instanceof Error ? error.message : 'No pudimos procesar tu selección. Intenta nuevamente.', true);
                 } finally {
                     isSubmitting = false;
                     sync();
