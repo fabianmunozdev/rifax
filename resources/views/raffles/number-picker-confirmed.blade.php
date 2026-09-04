@@ -155,7 +155,21 @@
             font-weight: 700;
             text-decoration: none;
             box-shadow: 0 14px 28px rgba(37, 211, 102, 0.18);
-            margin-top: 8px;
+            text-align: center;
+            white-space: nowrap;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .cta:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 18px 34px rgba(37, 211, 102, 0.24);
+        }
+        .cta:active {
+            transform: translateY(0);
+        }
+        .cta--hero {
+            margin-top: 2px;
+            padding: 14px 18px;
+            font-size: 16px;
         }
         .cta-icon { width: 18px; height: 18px; flex: 0 0 18px; }
         .footnote {
@@ -189,13 +203,19 @@
                 <h1 class="title">Tu reserva está confirmada</h1>
                 <p class="subtitle">
                     @if ($requiresOnboarding)
-                        Antes de finalizar, necesitamos unos datos rápidos para completar tu registro.
-                        <strong>Ya te enviamos todo por WhatsApp</strong>, ábrelo y sigue las instrucciones para terminar de confirmar la reserva.
+                        Revisa el mensaje que te enviamos por WhatsApp: allí te pedimos unos datos rápidos para finalizar tu registro y completar la reserva.
                     @else
-                        Guardamos tus números y <strong>ya te enviamos por WhatsApp la confirmación con los datos de pago</strong>.
-                        Abre tu chat y continúa el proceso desde allí.
+                        Revisa la confirmación que te enviamos a WhatsApp. Continúa allí con el proceso de pago.
                     @endif
                 </p>
+                @if (isset($whatsappOpenUrl) && is_string($whatsappOpenUrl) && $whatsappOpenUrl !== '')
+                    <a class="cta cta--hero" href="{{ $whatsappOpenUrl }}" target="_blank" rel="noopener noreferrer">
+                        <svg class="cta-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+                            <path d="M19.05 4.91A9.82 9.82 0 0 0 12.03 2C6.57 2 2.12 6.42 2.12 11.88c0 1.75.46 3.46 1.34 4.97L2 22l5.3-1.39a9.9 9.9 0 0 0 4.73 1.21h.01c5.46 0 9.88-4.42 9.88-9.88a9.8 9.8 0 0 0-2.87-7.03ZM12 20.15a8.27 8.27 0 0 1-4.22-1.16l-.3-.18-3.16.83.84-3.08-.2-.32a8.2 8.2 0 0 1-1.26-4.36c0-4.55 3.71-8.25 8.26-8.25 2.2 0 4.27.87 5.83 2.42a8.22 8.22 0 0 1 2.4 5.85c0 4.55-3.7 8.26-8.19 8.27Z"/>
+                        </svg>
+                        <span>Abrir WhatsApp para continuar</span>
+                    </a>
+                @endif
             </div>
 
             <div class="section">
@@ -231,8 +251,7 @@
             </div>
 
             @if (isset($whatsappOpenUrl) && is_string($whatsappOpenUrl) && $whatsappOpenUrl !== '')
-                <div class="section">
-                    <h2>Continúa el proceso</h2>
+                <div style="padding-top: 2px; margin-top: -2px;">
                     <a class="cta" href="{{ $whatsappOpenUrl }}" target="_blank" rel="noopener noreferrer">
                         <svg class="cta-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
                             <path d="M19.05 4.91A9.82 9.82 0 0 0 12.03 2C6.57 2 2.12 6.42 2.12 11.88c0 1.75.46 3.46 1.34 4.97L2 22l5.3-1.39a9.9 9.9 0 0 0 4.73 1.21h.01c5.46 0 9.88-4.42 9.88-9.88a9.8 9.8 0 0 0-2.87-7.03ZM12 20.15a8.27 8.27 0 0 1-4.22-1.16l-.3-.18-3.16.83.84-3.08-.2-.32a8.2 8.2 0 0 1-1.26-4.36c0-4.55 3.71-8.25 8.26-8.25 2.2 0 4.27.87 5.83 2.42a8.22 8.22 0 0 1 2.4 5.85c0 4.55-3.7 8.26-8.19 8.27Z"/>
