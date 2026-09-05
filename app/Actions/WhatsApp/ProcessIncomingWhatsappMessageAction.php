@@ -1350,9 +1350,7 @@ class ProcessIncomingWhatsappMessageAction
         $body = $message.PHP_EOL.PHP_EOL
             .'Después de pagar, envía una foto clara del comprobante por este chat para continuar.';
 
-        return WhatsAppReply::make($body, [
-            ['id' => 'payment_menu', 'title' => 'Menú'],
-        ]);
+        return WhatsAppReply::make($body, []);
     }
 
     /**

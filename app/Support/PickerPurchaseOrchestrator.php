@@ -90,11 +90,11 @@ final class PickerPurchaseOrchestrator
         $redirect = self::buildConfirmedRedirectUrl($raffle, $numbers, $purchase, false);
         $rendered = self::renderReservationConfirmationBody($purchase);
         $body = is_array($rendered) ? (string) ($rendered['body'] ?? $rendered[0] ?? '') : (string) $rendered;
-        $buttons = [
-            ['id' => 'payment_menu', 'title' => 'Menú'],
-        ];
+        $buttons = [];
 
-        $outbound = self::dispatchOutboundInteractive($customer, $body, $buttons);
+        $outbound = $buttons === []
+            ? self::dispatchOutboundText($customer, $body)
+            : self::dispatchOutboundInteractive($customer, $body, $buttons);
 
         return [
             'ok' => true,
