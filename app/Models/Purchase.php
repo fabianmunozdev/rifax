@@ -92,4 +92,13 @@ class Purchase extends Model
     {
         return $this->hasOne(Ticket::class);
     }
+
+    /**
+     * @return HasOne<WhatsappMessage>
+     */
+    public function latestWhatsappMessageOfIntent(): HasOne
+    {
+        return $this->hasOne(WhatsappMessage::class, 'customer_id', 'customer_id')
+            ->latestOfMany();
+    }
 }

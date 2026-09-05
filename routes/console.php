@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Purchases\ExpireReservationAction;
+use App\Actions\WhatsApp\SendPurchasePaymentReminderWhatsappAction;
 use App\Models\Purchase;
 use App\Models\RaffleNumber;
 use App\Models\Reservation;
@@ -54,6 +55,55 @@ app()->booted(function (): void {
         ->name('rifax:expire-reservations')
         ->everyMinute()
         ->withoutOverlapping(5)
+        ->onOneServer();
+
+    $schedule->call(function (SendPurchasePaymentReminderWhatsappAction $paymentReminderAction): void {
+        try {
+            $windowStart = now();
+            $windowEnd = now()->addMinutes(5);
+
+            $dueReminders = Purchase::query()
+                ->with(['customer', 'raffle'])
+                ->whereIn('status', ['reserved', 'rejected'])
+                ->whereNotNull('reserved_until')
+                ->whereBetween('reserved_until', [$windowStart, $windowEnd])
+                ->cursor();
+
+            $sent = 0;
+            $skipped = 0;
+
+            foreach ($dueReminders as $purchase) {
+                if ($purchase->customer === null) {
+                    $skipped++;
+                    continue;
+                }
+
+                try {
+                    $paymentReminderAction->execute($purchase);
+                    $sent++;
+                } catch (\Throwable $e) {
+                    $skipped++;
+                    Log::warning('Scheduler PurchasePaymentReminder: reminder skipped.', [
+                        'purchase_id' => $purchase->id,
+                        'message' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            if ($sent > 0 || $skipped > 0) {
+                Log::info('Scheduler PurchasePaymentReminder near-expire done.', [
+                    'sent' => $sent,
+                    'skipped' => $skipped,
+                    'window' => ['from' => $windowStart->toIso8601String(), 'to' => $windowEnd->toIso8601String()],
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Scheduler PurchasePaymentReminder fatal error.', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+        }
+    })
+        ->name('rifax:payment-reminders-near-expire')
+        ->everyMinute()
+        ->withoutOverlapping(10)
         ->onOneServer();
 
     $schedule->call(function (): void {
