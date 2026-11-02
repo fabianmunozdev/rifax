@@ -93,7 +93,7 @@ class AdminLocalePreferenceTest extends TestCase
         app()->setLocale('es');
 
         $this->assertSame('Administrador', PanelRole::Admin->label());
-        $this->assertSame('Configuracion de Empresa', CompanySettingResource::getNavigationLabel());
+        $this->assertSame('Configuración de empresa', CompanySettingResource::getNavigationLabel());
         $this->assertSame('Rifas', RaffleResource::getNavigationLabel());
         $this->assertSame('Pagos', PaymentResource::getNavigationLabel());
         $this->assertSame('Compras', PurchaseResource::getNavigationLabel());
@@ -101,12 +101,12 @@ class AdminLocalePreferenceTest extends TestCase
         $this->assertSame('Clientes', CustomerResource::getNavigationLabel());
         $this->assertSame('Boletos', TicketResource::getNavigationLabel());
         $this->assertSame('Mensajes de WhatsApp', WhatsappMessageResource::getNavigationLabel());
-        $this->assertSame('En revision', OperationsUi::paymentStatusLabel('pending_review'));
+        $this->assertSame('En revisión', OperationsUi::paymentStatusLabel('pending_review'));
         $this->assertSame('Pago enviado', OperationsUi::purchaseStatusLabel('payment_submitted'));
         $this->assertSame('Entregado', OperationsUi::whatsappProviderStatusLabel('delivered'));
         $this->assertSame('Recordatorio de pago', OperationsUi::whatsappIntentLabel('purchase_payment_reminder'));
         $this->assertSame('Menu principal', OperationsUi::conversationStatusLabel('main_menu'));
-        $this->assertSame('Salud de revision financiera', $this->widgetHeading(FinanceReviewHealthWidget::class));
+        $this->assertSame('Salud de revisión financiera', $this->widgetHeading(FinanceReviewHealthWidget::class));
         $this->assertSame('Salud del canal de WhatsApp', $this->widgetHeading(WhatsappChannelHealthWidget::class));
         $this->assertSame('Salud de notificaciones de ganador', $this->widgetHeading(RaffleWinnerNotificationHealthWidget::class));
 
