@@ -3,6 +3,7 @@
 namespace App\Actions\WhatsApp;
 
 use App\Actions\Content\ResolvePublishedContentAction;
+use App\Actions\Conversations\HumanHandoffAction;
 use App\Actions\Payments\SubmitPaymentProofAction;
 use App\Actions\Purchases\CancelPurchaseFlowAction;
 use App\Actions\Purchases\ReserveNumbersAction;
@@ -31,6 +32,7 @@ class ProcessIncomingWhatsappMessageAction
         protected SelectRandomRaffleNumbersAction $selectRandomRaffleNumbersAction,
         protected CancelPurchaseFlowAction $cancelPurchaseFlowAction,
         protected SubmitPaymentProofAction $submitPaymentProofAction,
+        protected HumanHandoffAction $humanHandoffAction,
     ) {}
 
     /**
@@ -67,7 +69,17 @@ class ProcessIncomingWhatsappMessageAction
             ];
         }
 
-        $reply = $this->resolveReply($customer, $conversationState->fresh(), $inboundMessage);
+        $conversationState = $conversationState->fresh();
+
+        if ($conversationState->isHandledByHuman()) {
+            $humanResult = $this->handleHumanConversation($customer, $conversationState, $inboundMessage);
+
+            if ($humanResult !== null) {
+                return $humanResult;
+            }
+        }
+
+        $reply = $this->resolveReply($customer, $conversationState, $inboundMessage);
 
         if ($reply instanceof WhatsAppReply && $reply->hasButtons()) {
             $outboundMessage = WhatsappMessage::query()->create([
@@ -383,6 +395,17 @@ class ProcessIncomingWhatsappMessageAction
             return $this->renderMainMenu();
         }
 
+        if ($this->isHumanAgentRequest($normText)) {
+            $this->humanHandoffAction->request($state, mb_substr($rawText, 0, 1000));
+
+            return $this->resolvePublishedContentAction->byKey(
+                'system.handoff.requested',
+                [],
+                'Listo, un asesor te atenderá por este chat lo antes posible.'.PHP_EOL.PHP_EOL
+                .'Mientras tanto el asistente automático queda en pausa. Si prefieres volver a las opciones automáticas, escribe MENU.',
+            );
+        }
+
         if ($this->isCancelCommand($normText)) {
             $activePurchase = $state->purchase;
             $hasActiveReservedPurchase = $activePurchase instanceof Purchase
@@ -401,7 +424,7 @@ class ProcessIncomingWhatsappMessageAction
 
                     return 'Para evitar que pierdas tu reserva por error, este chat no puede cancelarla automáticamente.'.PHP_EOL.PHP_EOL
                         .$hint.PHP_EOL.PHP_EOL
-                        .'Si necesitas ayuda, escribe AYUDA y te atendemos personalmente. Para volver al listado principal escribe MENU.';
+                        .'Si necesitas ayuda, escribe ASESOR y te atendemos personalmente. Para volver al listado principal escribe MENU.';
                 })();
             }
 
@@ -1620,7 +1643,7 @@ class ProcessIncomingWhatsappMessageAction
             .'1. Condiciones de la rifa'.PHP_EOL
             .'2. Métodos de pago'.PHP_EOL
             .'3. Estado de tu compra'.PHP_EOL
-            .'4. Hablar con soporte',
+            .'4. Hablar con una persona: escribe ASESOR',
         );
     }
 
@@ -1778,6 +1801,59 @@ class ProcessIncomingWhatsappMessageAction
     {
         return $normText === 'MENU'
             || $this->containsAnyKeyword($normText, ['MENU', 'VOLVER AL MENU', 'INICIO', 'REGRESAR AL INICIO']);
+    }
+
+    protected function isHumanAgentRequest(string $normText): bool
+    {
+        return $this->containsAnyKeyword($normText, [
+            'ASESOR', 'AGENTE', 'HUMANO', 'PERSONA REAL', 'HABLAR CON ALGUIEN',
+            'HABLAR CON UNA PERSONA', 'HABLAR CON SOPORTE', 'OPERADOR',
+        ]);
+    }
+
+    /**
+     * El chat lo atiende (o espera) un agente: se guarda el mensaje sin
+     * respuesta automática. Devuelve null cuando el bot debe retomar.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function handleHumanConversation(Customer $customer, ConversationState $state, WhatsappMessage $inboundMessage): ?array
+    {
+        $normText = $this->normalizeKeywordText(trim(Str::upper((string) ($inboundMessage->body_text ?? ''))));
+
+        $lastHumanActivity = collect([$state->handoff_requested_at, $state->handoff_started_at, $state->last_agent_message_at])
+            ->filter()
+            ->max();
+        $idleMinutes = (int) config('rifax.handoff.idle_release_minutes', 720);
+        $isIdle = $idleMinutes > 0 && $lastHumanActivity !== null && $lastHumanActivity->lt(now()->subMinutes($idleMinutes));
+
+        // Mientras nadie lo ha tomado, el cliente puede volver al bot con MENU.
+        $customerCancelled = $state->handoff_status === ConversationState::HANDOFF_REQUESTED && $this->isMenuCommand($normText);
+
+        if ($isIdle || $customerCancelled) {
+            $state->forceFill([
+                'handoff_status' => null,
+                'assigned_user_id' => null,
+                'handoff_requested_at' => null,
+                'handoff_started_at' => null,
+                'handoff_reason' => null,
+            ])->save();
+
+            return null;
+        }
+
+        $state->forceFill([
+            'last_inbound_message_id' => $inboundMessage->id,
+            'last_user_message_at' => now(),
+        ])->save();
+
+        return [
+            'customer_id' => $customer->id,
+            'conversation_status' => $state->status,
+            'handoff_status' => $state->handoff_status,
+            'reply' => null,
+            'delivery_status' => null,
+        ];
     }
 
     protected function isCancelCommand(string $normText): bool
