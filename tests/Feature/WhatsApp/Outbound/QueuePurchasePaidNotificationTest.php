@@ -25,7 +25,7 @@ class QueuePurchasePaidNotificationTest extends TestCase
 
     public function test_it_queues_a_template_notification_when_the_conversation_is_outside_the_24h_window(): void
     {
-        Queue::fake();
+        Queue::fake([DispatchWhatsappMessageJob::class]);
         Storage::fake('public');
 
         config()->set('services.whatsapp.send_enabled', true);

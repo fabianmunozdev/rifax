@@ -67,7 +67,7 @@ class RaffleNumberPickerPageTest extends TestCase
             ->assertSee('573009994455')
             ->assertSee('0 seleccionados de 2', escape: false)
             ->assertSee('Continuar compra por WhatsApp')
-            ->assertSee('Se abrira un mensaje listo para enviar. No necesitas editarlo.')
+            ->assertSee('Se abrirá un mensaje de WhatsApp listo para enviar. No necesitas editarlo.')
             ->assertSee('/raffles/rifa-web/number-picker/intents?source=landing_featured&amp;utm_source=facebook&amp;utm_campaign=rifa-julio', escape: false);
     }
 
@@ -187,9 +187,9 @@ class RaffleNumberPickerPageTest extends TestCase
         $this->assertSame('https://rifax.test/?utm_source=facebook', $intent->metadata_json['referrer_url'] ?? null);
         $this->assertSame('facebook', $intent->metadata_json['utm_source'] ?? null);
         $this->assertSame('rifa-julio', $intent->metadata_json['utm_campaign'] ?? null);
-        $this->assertStringContainsString('Hola, quiero continuar con mi seleccion visual', $response->json('whatsapp_message'));
-        $this->assertStringContainsString("Codigo de seleccion: PICKER {$intent->token}", $response->json('whatsapp_message'));
-        $this->assertStringContainsString('mantener este mensaje sin modificar', Strtolower($response->json('whatsapp_message')));
+        $this->assertStringContainsString('Ya seleccioné mis números y quiero continuar', $response->json('whatsapp_message'));
+        $this->assertStringContainsString("el código de mi selección es: PICKER {$intent->token}", $response->json('whatsapp_message'));
+        $this->assertStringContainsString('no modifiques este mensaje', $response->json('whatsapp_message'));
         $this->assertNull($intent->consumed_at);
     }
 }

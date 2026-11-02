@@ -26,7 +26,7 @@ class QueueRaffleWinnerNotificationTest extends TestCase
 
     public function test_it_queues_a_text_notification_for_the_winner_inside_the_24h_window(): void
     {
-        Queue::fake();
+        Queue::fake([DispatchWhatsappMessageJob::class]);
         Storage::fake('public');
 
         config()->set('services.whatsapp.send_enabled', true);
@@ -91,7 +91,7 @@ class QueueRaffleWinnerNotificationTest extends TestCase
 
     public function test_it_queues_a_template_notification_for_the_winner_outside_the_24h_window(): void
     {
-        Queue::fake();
+        Queue::fake([DispatchWhatsappMessageJob::class]);
         Storage::fake('public');
 
         config()->set('services.whatsapp.send_enabled', true);

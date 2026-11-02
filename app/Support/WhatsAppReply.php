@@ -4,7 +4,7 @@ namespace App\Support;
 
 use InvalidArgumentException;
 
-final class WhatsAppReply
+final class WhatsAppReply implements \Stringable
 {
     public readonly string $body;
 
@@ -56,6 +56,26 @@ final class WhatsAppReply
 
         $this->body = $body;
         $this->buttons = $cleanButtons;
+    }
+
+    /**
+     * Antepone texto conservando los botones.
+     */
+    public static function prefixed(string $prefix, self|string $reply): self|string
+    {
+        if ($reply instanceof self) {
+            return new self($prefix.$reply->body, $reply->buttons);
+        }
+
+        return $prefix.$reply;
+    }
+
+    /**
+     * Permite concatenar la respuesta como texto (los botones se pierden).
+     */
+    public function __toString(): string
+    {
+        return $this->body;
     }
 
     public function hasButtons(): bool
