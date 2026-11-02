@@ -4,28 +4,34 @@ namespace App\Actions\WhatsApp;
 
 use App\Models\Customer;
 use App\Models\WhatsappMessage;
-use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Http;
-use Throwable;
+use App\Services\WhatsApp\WhatsappProvider;
+use App\Services\WhatsApp\WhatsappProviderException;
 
+/**
+ * Envía un mensaje con el proveedor activo y registra el resultado.
+ *
+ * Las claves meta_request / meta_response / meta_error se mantienen para
+ * cualquier proveedor porque el panel las consulta; 'provider' indica cuál envió.
+ */
 class DispatchOutboundWhatsappMessageAction
 {
+    public function __construct(
+        protected WhatsappProvider $provider,
+    ) {}
+
     public function execute(Customer $customer, WhatsappMessage $message, bool $rethrowFailures = false): WhatsappMessage
     {
         if (! config('services.whatsapp.send_enabled')) {
             return $message->fresh() ?? $message;
         }
 
-        $waId = $customer->wa_id ?: preg_replace('/\D+/', '', (string) ($customer->phone ?? ''));
-        $phoneNumberId = (string) config('services.whatsapp.phone_number_id');
-        $accessToken = (string) config('services.whatsapp.access_token');
-        $waDigits = (string) preg_replace('/\D+/', '', (string) $waId);
+        $recipient = (string) preg_replace('/\D+/', '', (string) ($customer->wa_id ?: $customer->phone));
 
-        if ($waDigits === '' || strlen($waDigits) < 7 || $phoneNumberId === '' || $accessToken === '') {
+        if (strlen($recipient) < 7 || ! $this->provider->isConfigured()) {
             $message->forceFill([
                 'status' => 'failed',
                 'payload_json' => array_merge($message->payload_json ?? [], [
+                    'provider' => $this->provider->name(),
                     'meta_error' => 'Missing WhatsApp outbound configuration.',
                 ]),
             ])->save();
@@ -33,109 +39,33 @@ class DispatchOutboundWhatsappMessageAction
             return $message->fresh() ?? $message;
         }
 
-        $payload = $this->buildPayload($waId, $message);
-
-        $endpoint = rtrim((string) config('services.whatsapp.api_base_url'), '/')
-            .'/'.trim((string) config('services.whatsapp.graph_version'), '/')
-            .'/'.$phoneNumberId.'/messages';
-
         try {
-            $response = Http::timeout((int) config('services.whatsapp.timeout_seconds', 10))
-                ->withToken($accessToken)
-                ->acceptJson()
-                ->asJson()
-                ->post($endpoint, $payload)
-                ->throw();
+            $result = $this->provider->send($recipient, $message);
 
             $message->forceFill([
-                'provider_message_id' => Arr::get($response->json(), 'messages.0.id'),
+                'provider_message_id' => $result['provider_message_id'],
                 'status' => 'sent',
                 'payload_json' => array_merge($message->payload_json ?? [], [
-                    'meta_request' => $payload,
-                    'meta_response' => $response->json(),
+                    'provider' => $this->provider->name(),
+                    'meta_request' => $result['request'],
+                    'meta_response' => $result['response'],
                 ]),
             ])->save();
-        } catch (RequestException $exception) {
-            $response = $exception->response;
-
+        } catch (WhatsappProviderException $exception) {
             $message->forceFill([
                 'status' => 'failed',
                 'payload_json' => array_merge($message->payload_json ?? [], [
-                    'meta_request' => $payload,
-                    'meta_error' => [
-                        'message' => $exception->getMessage(),
-                        'status' => $response?->status(),
-                        'body' => $response?->json() ?? $response?->body(),
-                    ],
+                    'provider' => $this->provider->name(),
+                    'meta_request' => $exception->request,
+                    'meta_error' => $exception->error,
                 ]),
             ])->save();
 
             if ($rethrowFailures) {
-                throw $exception;
-            }
-        } catch (Throwable $exception) {
-            $message->forceFill([
-                'status' => 'failed',
-                'payload_json' => array_merge($message->payload_json ?? [], [
-                    'meta_request' => $payload,
-                    'meta_error' => [
-                        'message' => $exception->getMessage(),
-                    ],
-                ]),
-            ])->save();
-
-            if ($rethrowFailures) {
-                throw $exception;
+                throw $exception->getPrevious() ?? $exception;
             }
         }
 
         return $message->fresh() ?? $message;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function buildPayload(string $waId, WhatsappMessage $message): array
-    {
-        if ($message->message_type === 'template') {
-            return [
-                'messaging_product' => 'whatsapp',
-                'recipient_type' => 'individual',
-                'to' => $waId,
-                'type' => 'template',
-                'template' => Arr::get($message->payload_json, 'template', []),
-            ];
-        }
-
-        if ($message->message_type === 'document') {
-            return [
-                'messaging_product' => 'whatsapp',
-                'recipient_type' => 'individual',
-                'to' => $waId,
-                'type' => 'document',
-                'document' => Arr::get($message->payload_json, 'document', []),
-            ];
-        }
-
-        if ($message->message_type === 'interactive') {
-            return [
-                'messaging_product' => 'whatsapp',
-                'recipient_type' => 'individual',
-                'to' => $waId,
-                'type' => 'interactive',
-                'interactive' => Arr::get($message->payload_json, 'interactive', []),
-            ];
-        }
-
-        return [
-            'messaging_product' => 'whatsapp',
-            'recipient_type' => 'individual',
-            'to' => $waId,
-            'type' => 'text',
-            'text' => [
-                'preview_url' => false,
-                'body' => $message->body_text,
-            ],
-        ];
     }
 }
