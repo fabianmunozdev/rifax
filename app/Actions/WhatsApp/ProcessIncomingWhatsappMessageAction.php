@@ -113,7 +113,8 @@ class ProcessIncomingWhatsappMessageAction
         return [
             'customer_id' => $customer->id,
             'conversation_status' => $updatedState->status,
-            'reply' => $reply,
+            'reply' => (string) $reply,
+            'reply_buttons' => $reply instanceof WhatsAppReply ? $reply->buttons : [],
             'delivery_status' => $outboundMessage->status,
         ];
     }
@@ -409,7 +410,7 @@ class ProcessIncomingWhatsappMessageAction
         }
 
         if ($inboundMessage->message_type === 'image' && ! in_array($state->status, ['purchase_payment_instructions', 'purchase_rejected', 'purchase_under_review'], true)) {
-            return 'Recibimos una imagen, pero ahora mismo no estamos esperando un comprobante de pago.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+            return WhatsAppReply::prefixed('Recibimos una imagen, pero ahora mismo no estamos esperando un comprobante de pago.'.PHP_EOL.PHP_EOL, $this->renderMainMenu());
         }
 
         if ($this->isFaqShortcut($normText)) {
@@ -499,14 +500,14 @@ class ProcessIncomingWhatsappMessageAction
             if ($raffles->isEmpty()) {
                 $this->resetToMainMenu($state);
 
-                return 'No encontramos rifas activas para continuar.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+                return WhatsAppReply::prefixed('No encontramos rifas activas para continuar.'.PHP_EOL.PHP_EOL, $this->renderMainMenu());
             }
 
             if ($raffles->count() > 1) {
                 $selectedRaffle = $raffles->values()->get(((int) $text) - 1);
 
                 if (! $selectedRaffle instanceof Raffle) {
-                    return 'Responde con el número de la rifa que deseas comprar.'.PHP_EOL.PHP_EOL.$this->renderRaffleOptions($raffles);
+                    return WhatsAppReply::prefixed('Responde con el número de la rifa que deseas comprar.'.PHP_EOL.PHP_EOL, $this->renderRaffleOptions($raffles));
                 }
 
                 $state->forceFill([
@@ -524,7 +525,7 @@ class ProcessIncomingWhatsappMessageAction
             if ($raffle === null) {
                 $this->resetToMainMenu($state);
 
-                return 'No encontramos una rifa activa para continuar. '.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+                return WhatsAppReply::prefixed('No encontramos una rifa activa para continuar. '.PHP_EOL.PHP_EOL, $this->renderMainMenu());
             }
 
             $state->forceFill([
@@ -726,7 +727,7 @@ class ProcessIncomingWhatsappMessageAction
         if ($purchase === null || ! in_array($purchase->status, ['payment_submitted'], true)) {
             $this->resetToMainMenu($state);
 
-            return 'Tu compra ya no está en revisión. Regresamos al menú principal.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+            return WhatsAppReply::prefixed('Tu compra ya no está en revisión. Regresamos al menú principal.'.PHP_EOL.PHP_EOL, $this->renderMainMenu());
         }
 
         $pendingPayment = $purchase->payments()
@@ -879,7 +880,7 @@ class ProcessIncomingWhatsappMessageAction
             ? 'Tu compra anterior ya fue aprobada. Si quieres participar de nuevo, puedes iniciar otra compra desde aquí.'
             : 'Tu compra anterior ya terminó. Si quieres participar de nuevo, puedes iniciar otra compra desde aquí.';
 
-        return $intro.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+        return WhatsAppReply::prefixed($intro.PHP_EOL.PHP_EOL, $this->renderMainMenu());
     }
 
     protected function resetToMainMenu(ConversationState $state): void
@@ -911,7 +912,7 @@ class ProcessIncomingWhatsappMessageAction
             $raffle = $this->getActiveRaffle();
 
             if ($raffle === null) {
-                return 'Ahora mismo no tenemos una rifa activa disponible.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+                return WhatsAppReply::prefixed('Ahora mismo no tenemos una rifa activa disponible.'.PHP_EOL.PHP_EOL, $this->renderMainMenu());
             }
 
             $state->forceFill([
@@ -931,7 +932,7 @@ class ProcessIncomingWhatsappMessageAction
         ]);
     }
 
-    protected function redirectToPurchaseOnboardingIfNeeded(Customer $customer, ConversationState $state, string $pendingAction, array $metadata = []): ?string
+    protected function redirectToPurchaseOnboardingIfNeeded(Customer $customer, ConversationState $state, string $pendingAction, array $metadata = []): WhatsAppReply|string|null
     {
         $requiredStatus = $this->requiredPurchaseOnboardingStatus($customer);
 
@@ -991,7 +992,7 @@ class ProcessIncomingWhatsappMessageAction
         if (in_array($text, ['2', 'NO ACEPTO', 'NO', 'RECHAZO'], true)) {
             $this->resetToMainMenu($state);
 
-            return 'Entendido. No continuaremos con la compra sin tu autorización.'.PHP_EOL.PHP_EOL.$this->renderMainMenu();
+            return WhatsAppReply::prefixed('Entendido. No continuaremos con la compra sin tu autorización.'.PHP_EOL.PHP_EOL, $this->renderMainMenu());
         }
 
         return $this->renderPrivacyConsentPrompt();
@@ -1053,7 +1054,7 @@ class ProcessIncomingWhatsappMessageAction
         return $this->resumePendingAction($customer, $state);
     }
 
-    protected function resumePendingAction(Customer $customer, ConversationState $state): string
+    protected function resumePendingAction(Customer $customer, ConversationState $state): WhatsAppReply|string
     {
         $metadata = $state->metadata_json ?? [];
         $pendingAction = (string) ($metadata['pending_action'] ?? '');
@@ -1094,7 +1095,7 @@ class ProcessIncomingWhatsappMessageAction
         return $this->requiredPurchaseOnboardingStatus($customer) === null;
     }
 
-    protected function recoverCompletedOnboarding(Customer $customer, ConversationState $state, string $text): string
+    protected function recoverCompletedOnboarding(Customer $customer, ConversationState $state, string $text): WhatsAppReply|string
     {
         $pendingAction = (string) (($state->metadata_json ?? [])['pending_action'] ?? '');
 

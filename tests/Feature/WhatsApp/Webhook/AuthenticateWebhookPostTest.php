@@ -3,6 +3,7 @@
 namespace Tests\Feature\WhatsApp\Webhook;
 
 use App\Models\AdminAuditLog;
+use App\Models\Customer;
 use App\Models\Raffle;
 use App\Models\RaffleNumber;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,6 +27,15 @@ class AuthenticateWebhookPostTest extends TestCase
         ]);
 
         RaffleNumber::factory()->for($raffle)->count(2)->create();
+
+        // Cliente con registro completo: comprar no exige aceptar datos de nuevo.
+        Customer::factory()->create([
+            'phone' => '+573001112233',
+            'wa_id' => '573001112233',
+            'name' => 'Juan Perez',
+            'document_number' => '123456789',
+            'accepted_privacy_at' => now(),
+        ]);
 
         $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', '1'));
 

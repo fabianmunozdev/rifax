@@ -121,17 +121,17 @@ class PublicLandingTest extends TestCase
             ->assertSee('Descubre la rifa destacada del momento')
             ->assertSee('Rifa Landing')
             ->assertSee('Una rifa publica para la landing.')
-            ->assertSee('Elegir numeros ahora')
-            ->assertSee('Como Funciona')
-            ->assertSee('Informacion Operativa')
+            ->assertSee('Elegir números ahora')
+            ->assertSee('Cómo funciona')
+            ->assertSee('Información operativa')
             ->assertSee('Preguntas Frecuentes')
             ->assertSee('Como envio el comprobante?')
             ->assertSee('Envialo directamente por WhatsApp y quedara en revision.')
-            ->assertSee('Los metodos de pago visibles se confirman por WhatsApp')
-            ->assertSee('Metodos visibles:')
+            ->assertSee('Los métodos de pago visibles se confirman por WhatsApp')
+            ->assertSee('Métodos visibles:')
             ->assertSee('Nequi: 3001112233')
-            ->assertSee('Tus numeros se reservan por tiempo limitado mientras completas el pago.')
-            ->assertSee('Si envias el comprobante antes del sorteo, la compra queda en revision')
+            ->assertSee('Tus números se reservan por tiempo limitado mientras completas el pago.')
+            ->assertSee('Si envías el comprobante antes del sorteo, la compra queda en revisión')
             ->assertSee('Las compras pendientes deben resolverse antes de publicar el resultado final dentro de la plataforma.')
             ->assertSee('Ganadores Recientes')
             ->assertSee('Rifa Cerrada')
@@ -140,7 +140,7 @@ class PublicLandingTest extends TestCase
             ->assertSee('https://rifax.test/resultados/rifa-cerrada', escape: false)
             ->assertSee('https://rifax.test/terminos', escape: false)
             ->assertSee('https://rifax.test/privacidad', escape: false)
-            ->assertSee('Seleccionar numeros')
+            ->assertSee('Seleccionar números')
             ->assertSee('Comprar por WhatsApp')
             ->assertSee('data-testid="mobile-sticky-cta"', escape: false)
             ->assertSee('Elegir numeros')
@@ -217,7 +217,7 @@ class PublicLandingTest extends TestCase
         $response = $this->get('/');
 
         $response->assertOk()
-            ->assertSee('Mas Rifas Activas')
+            ->assertSee('Más rifas activas')
             ->assertSee('Rifa destacada')
             ->assertSee('Todas')
             ->assertSee('Rifa Dos')
@@ -233,6 +233,6 @@ class PublicLandingTest extends TestCase
 
         $response->assertOk()
             ->assertSee('No hay rifas activas por ahora')
-            ->assertSee('Rifas Disponibles');
+            ->assertSee('Rifas disponibles');
     }
 }

@@ -59,6 +59,9 @@ class ReceiveMessageTest extends TestCase
 
     public function test_it_requires_privacy_consent_and_identity_before_starting_a_purchase(): void
     {
+        // La rifa sortea el 5 de agosto de 2026: el escenario ocurre antes de esa fecha.
+        $this->travelTo(now()->setDate(2026, 7, 20)->setTime(10, 0));
+
         $raffle = Raffle::factory()->published()->create([
             'title' => 'Rifa Onboarding',
             'price_per_number' => 4000,
@@ -76,8 +79,8 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'onboarding_privacy_consent');
 
-        $this->assertStringContainsString('1. Acepto', $response->json('responses.0.reply'));
-        $this->assertStringContainsString('2. No acepto', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('Responde ACEPTAR o NO ACEPTAR', $response->json('responses.0.reply'));
+        $this->assertNotEmpty($response->json('responses.0.reply_buttons'));
 
         $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', '1'));
 
@@ -1167,7 +1170,7 @@ class ReceiveMessageTest extends TestCase
         $this->assertStringContainsString('Rifa Sorteo Dos', $response->json('responses.0.reply'));
     }
 
-    public function test_cancelar_releases_the_active_reservation_and_returns_to_the_main_menu(): void
+    public function test_cancelar_keeps_the_active_reservation_to_avoid_accidental_loss(): void
     {
         $customer = Customer::factory()->create([
             'phone' => '+573001112233',
@@ -1194,21 +1197,22 @@ class ReceiveMessageTest extends TestCase
 
         $response = $this->postSignedWhatsappWebhook($this->textPayload('573001112233', 'CANCELAR'));
 
+        // Desde 544349b el chat no cancela reservas activas: se mantienen hasta pagar o vencer.
         $response->assertOk()
-            ->assertJsonPath('responses.0.conversation_status', 'main_menu');
+            ->assertJsonPath('responses.0.conversation_status', 'purchase_payment_instructions');
 
         $this->assertDatabaseHas('purchases', [
             'id' => $purchase->id,
-            'status' => 'cancelled',
+            'status' => 'reserved',
         ]);
 
         $this->assertDatabaseHas('raffle_numbers', [
             'raffle_id' => $raffle->id,
             'number' => '0001',
-            'status' => 'available',
+            'status' => 'reserved',
         ]);
 
-        $this->assertStringContainsString('reserva liberada', strtolower($response->json('responses.0.reply')));
+        $this->assertStringContainsString('no puede cancelarla automáticamente', $response->json('responses.0.reply'));
     }
 
     public function test_it_rejects_a_payment_proof_when_there_is_no_purchase_waiting_for_it(): void
