@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ConversationState extends Model
 {
@@ -34,7 +34,18 @@ class ConversationState extends Model
         'locked_at',
         'locked_by',
         'metadata_json',
+        'handoff_status',
+        'assigned_user_id',
+        'handoff_requested_at',
+        'handoff_started_at',
+        'handoff_reason',
+        'last_agent_message_at',
+        'agent_last_read_at',
     ];
+
+    public const HANDOFF_REQUESTED = 'requested';
+
+    public const HANDOFF_ACTIVE = 'active';
 
     /**
      * @return array<string, string>
@@ -49,12 +60,54 @@ class ConversationState extends Model
             'last_bot_message_at' => 'datetime',
             'context_expires_at' => 'datetime',
             'locked_at' => 'datetime',
+            'handoff_requested_at' => 'datetime',
+            'handoff_started_at' => 'datetime',
+            'last_agent_message_at' => 'datetime',
+            'agent_last_read_at' => 'datetime',
         ];
     }
 
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function assignedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_user_id');
+    }
+
+    /**
+     * Mientras un humano atiende o se espera a uno, el bot no responde.
+     */
+    public function isHandledByHuman(): bool
+    {
+        return in_array($this->handoff_status, [self::HANDOFF_REQUESTED, self::HANDOFF_ACTIVE], true);
+    }
+
+    public function hasUnreadForAgent(): bool
+    {
+        return $this->last_user_message_at !== null
+            && ($this->agent_last_read_at === null || $this->last_user_message_at->gt($this->agent_last_read_at));
+    }
+
+    /**
+     * WhatsApp solo permite mensajes libres hasta 24 h después del último mensaje del cliente.
+     */
+    public function isWithinCustomerServiceWindow(): bool
+    {
+        return $this->last_user_message_at !== null
+            && $this->last_user_message_at->gt(now()->subHours(24));
+    }
+
+    public function scopeAwaitingAgent(Builder $query): Builder
+    {
+        return $query->where('handoff_status', self::HANDOFF_REQUESTED);
+    }
+
+    public function scopeWithHuman(Builder $query): Builder
+    {
+        return $query->whereIn('handoff_status', [self::HANDOFF_REQUESTED, self::HANDOFF_ACTIVE]);
     }
 
     public function currentRaffle(): BelongsTo

@@ -3,9 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Model;
 
 class WhatsappMessage extends Model
 {
@@ -25,6 +25,7 @@ class WhatsappMessage extends Model
         'provider_status',
         'provider_created_at',
         'provider_status_at',
+        'sent_by_user_id',
     ];
 
     /**
@@ -42,6 +43,14 @@ class WhatsappMessage extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * Agente que escribió el mensaje (null = bot o sistema).
+     */
+    public function sentBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sent_by_user_id');
     }
 
     public function paymentProof(): HasOne

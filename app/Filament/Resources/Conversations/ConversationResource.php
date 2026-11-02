@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Conversations;
 
 use App\Actions\Admin\RecordAdminAuditAction;
 use App\Actions\Conversations\HardResetConversationAction;
+use App\Actions\Conversations\HumanHandoffAction;
 use App\Actions\Conversations\SoftResetConversationAction;
 use App\Enums\PanelPermission;
 use App\Filament\Resources\BaseResource;
@@ -14,16 +15,20 @@ use App\Filament\Resources\Payments\PaymentResource;
 use App\Filament\Resources\Purchases\PurchaseResource;
 use App\Filament\Resources\Raffles\RaffleResource;
 use App\Filament\Resources\WhatsappMessages\WhatsappMessageResource;
-use App\Filament\Support\PanelAccess;
 use App\Filament\Support\OperationsUi;
+use App\Filament\Support\PanelAccess;
+use App\Livewire\ConversationChat;
 use App\Models\ConversationState;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
@@ -63,6 +68,12 @@ class ConversationResource extends BaseResource
     {
         return $schema
             ->components([
+                Section::make(__('admin.resources.conversations.sections.chat'))
+                    ->description(fn (ConversationState $record): string => static::handoffLabel($record))
+                    ->columnSpanFull()
+                    ->schema([
+                        Livewire::make(ConversationChat::class)->key('conversation-chat'),
+                    ]),
                 Section::make(__('admin.resources.conversations.sections.current_state'))
                     ->columns(2)
                     ->schema([
@@ -147,13 +158,36 @@ class ConversationResource extends BaseResource
                 TextColumn::make('customer.phone')
                     ->label(__('admin.resources.conversations.fields.customer'))
                     ->searchable(),
+                TextColumn::make('customer.name')
+                    ->label(__('admin.resources.conversations.fields.customer_name'))
+                    ->placeholder('-')
+                    ->searchable()
+                    ->toggleable(),
+                TextColumn::make('handoff_status')
+                    ->label(__('admin.resources.conversations.fields.attention'))
+                    ->badge()
+                    ->state(fn (ConversationState $record): string => $record->handoff_status ?? 'bot')
+                    ->formatStateUsing(fn (string $state, ConversationState $record): string => static::handoffLabel($record))
+                    ->color(fn (string $state): string => match ($state) {
+                        ConversationState::HANDOFF_REQUESTED => 'danger',
+                        ConversationState::HANDOFF_ACTIVE => 'success',
+                        default => 'gray',
+                    })
+                    ->icon(fn (ConversationState $record): ?Heroicon => $record->hasUnreadForAgent() && $record->isHandledByHuman()
+                        ? Heroicon::Envelope
+                        : null),
                 TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => OperationsUi::conversationStatusLabel($state))
                     ->color(fn (?string $state): string => OperationsUi::conversationStatusColor($state)),
-                TextColumn::make('substatus')
+                TextColumn::make('lastInboundMessage.body_text')
+                    ->label(__('admin.resources.conversations.fields.last_inbound_text'))
+                    ->limit(50)
                     ->placeholder('-')
                     ->toggleable(),
+                TextColumn::make('substatus')
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('currentRaffle.title')
                     ->label(__('admin.resources.conversations.fields.raffle'))
                     ->placeholder('-')
@@ -183,7 +217,20 @@ class ConversationResource extends BaseResource
                     ->toggleable(),
             ])
             ->defaultSort('last_user_message_at', 'desc')
+            ->poll('15s')
             ->filters([
+                Filter::make('awaiting_agent')
+                    ->label(__('admin.resources.conversations.filters.awaiting_agent'))
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->awaitingAgent()),
+                Filter::make('with_human')
+                    ->label(__('admin.resources.conversations.filters.with_human'))
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->withHuman()),
+                Filter::make('assigned_to_me')
+                    ->label(__('admin.resources.conversations.filters.assigned_to_me'))
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->where('assigned_user_id', PanelAccess::user()?->id)),
                 SelectFilter::make('status')
                     ->options(static::conversationStatusOptions()),
                 SelectFilter::make('current_raffle_id')
@@ -207,6 +254,7 @@ class ConversationResource extends BaseResource
                     ->query(fn (Builder $query): Builder => $query->whereRaw("coalesce((metadata_json->>'follow_up_required')::boolean, false) = true")),
             ])
             ->recordActions([
+                static::makeTakeAction(),
                 static::makeOpenCustomerAction(),
                 static::makeOpenPurchaseAction(),
                 static::makeOpenPaymentAction(),
@@ -242,7 +290,121 @@ class ConversationResource extends BaseResource
                 'reservation',
                 'lastInboundMessage',
                 'lastOutboundMessage',
+                'assignedUser:id,name',
             ]);
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        $count = ConversationState::query()->whatsapp()->awaitingAgent()->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return __('admin.resources.conversations.filters.awaiting_agent');
+    }
+
+    public static function handoffLabel(ConversationState $record): string
+    {
+        return match ($record->handoff_status) {
+            ConversationState::HANDOFF_REQUESTED => __('admin.resources.conversations.handoff.requested'),
+            ConversationState::HANDOFF_ACTIVE => __('admin.resources.conversations.handoff.active', [
+                'agent' => $record->assignedUser?->name ?? '-',
+            ]),
+            default => __('admin.resources.conversations.handoff.bot'),
+        };
+    }
+
+    public static function makeTakeAction(): Action
+    {
+        return Action::make('take_conversation')
+            ->label(__('admin.resources.conversations.actions.take'))
+            ->icon(Heroicon::OutlinedHandRaised)
+            ->color('success')
+            ->visible(fn (ConversationState $record): bool => PanelAccess::allows(PanelPermission::ConversationsManage)
+                && $record->assigned_user_id !== PanelAccess::user()?->id)
+            ->requiresConfirmation()
+            ->modalDescription(__('admin.resources.conversations.modals.take'))
+            ->action(function (ConversationState $record, $livewire): void {
+                $user = PanelAccess::user();
+
+                app(HumanHandoffAction::class)->assign($record, $user, $user);
+
+                Notification::make()
+                    ->title(__('admin.resources.conversations.notifications.taken'))
+                    ->success()
+                    ->send();
+
+                $livewire->dispatch('handoff-updated');
+            });
+    }
+
+    public static function makeAssignAction(): Action
+    {
+        return Action::make('assign_conversation')
+            ->label(__('admin.resources.conversations.actions.assign'))
+            ->icon(Heroicon::OutlinedArrowsRightLeft)
+            ->color('info')
+            ->visible(fn (): bool => PanelAccess::allows(PanelPermission::ConversationsManage))
+            ->schema([
+                Select::make('agent_id')
+                    ->label(__('admin.resources.conversations.fields.agent'))
+                    ->options(fn (): array => User::query()
+                        ->where('is_active', true)
+                        ->orderBy('name')
+                        ->get()
+                        ->filter(fn (User $user): bool => $user->hasPanelPermission(PanelPermission::ConversationsManage))
+                        ->pluck('name', 'id')
+                        ->all())
+                    ->required()
+                    ->searchable(),
+            ])
+            ->action(function (ConversationState $record, array $data, $livewire): void {
+                $agent = User::query()->findOrFail($data['agent_id']);
+                abort_unless($agent->hasPanelPermission(PanelPermission::ConversationsManage), 422);
+
+                app(HumanHandoffAction::class)->assign($record, $agent, PanelAccess::user());
+
+                Notification::make()
+                    ->title(__('admin.resources.conversations.notifications.assigned', ['agent' => $agent->name]))
+                    ->success()
+                    ->send();
+
+                $livewire->dispatch('handoff-updated');
+            });
+    }
+
+    public static function makeReleaseAction(): Action
+    {
+        return Action::make('release_to_bot')
+            ->label(__('admin.resources.conversations.actions.release'))
+            ->icon(Heroicon::OutlinedCpuChip)
+            ->color('gray')
+            ->visible(fn (ConversationState $record): bool => PanelAccess::allows(PanelPermission::ConversationsManage)
+                && $record->isHandledByHuman())
+            ->schema([
+                Toggle::make('notify_customer')
+                    ->label(__('admin.resources.conversations.fields.notify_customer'))
+                    ->default(true),
+            ])
+            ->modalDescription(__('admin.resources.conversations.modals.release'))
+            ->action(function (ConversationState $record, array $data, $livewire): void {
+                app(HumanHandoffAction::class)->release($record, PanelAccess::user(), (bool) ($data['notify_customer'] ?? true));
+
+                Notification::make()
+                    ->title(__('admin.resources.conversations.notifications.released'))
+                    ->success()
+                    ->send();
+
+                $livewire->dispatch('handoff-updated');
+            });
     }
 
     public static function canCreate(): bool
