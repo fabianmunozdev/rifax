@@ -43,14 +43,20 @@ pnpm run build
 - `1026` SMTP Mailpit
 - `8026` dashboard Mailpit
 
-## Documentacion del Proyecto
-- Vision: [00-vision.md](file:///Users/macbookpro/Documents/DESARROLLO/Rifax/00-vision.md)
-- Arquitectura: [01-arquitectura.md](file:///Users/macbookpro/Documents/DESARROLLO/Rifax/01-arquitectura.md)
-- Plan de implementacion: [25-plan-implementacion.md](file:///Users/macbookpro/Documents/DESARROLLO/Rifax/25-plan-implementacion.md)
-- PRD formal: [.trae/documents/prd-rifax-mvp.md](file:///Users/macbookpro/Documents/DESARROLLO/Rifax/.trae/documents/prd-rifax-mvp.md)
-- Arquitectura formal: [.trae/documents/arquitectura-tecnica-rifax-mvp.md](file:///Users/macbookpro/Documents/DESARROLLO/Rifax/.trae/documents/arquitectura-tecnica-rifax-mvp.md)
+## Producción
 
-## Siguiente Fase Tecnica
-- Implementar migraciones del dominio base.
-- Crear recursos Filament de rifas, pagos, compras, contenido y conversaciones.
-- Sustituir tablas default por el modelo del negocio documentado.
+Producción corre con Docker en https://megaeliteoficial.com. Ver
+[documentation/despliegue-docker.md](documentation/despliegue-docker.md).
+
+```bash
+scripts/deploy.sh   # en el servidor, dentro de /opt/rifax
+```
+
+## Documentación del proyecto
+- Visión: [00-vision.md](00-vision.md)
+- Arquitectura: [01-arquitectura.md](01-arquitectura.md)
+- Reglas de negocio: [02-reglas-negocio.md](02-reglas-negocio.md)
+- Plan de implementación: [25-plan-implementacion.md](25-plan-implementacion.md)
+- Estructura del bot de WhatsApp: [documentation/estructura-bot-whatsapp.md](documentation/estructura-bot-whatsapp.md)
+- Despliegue con Docker: [documentation/despliegue-docker.md](documentation/despliegue-docker.md)
+- Respaldos: [documentation/respaldos-base-de-datos.md](documentation/respaldos-base-de-datos.md)
