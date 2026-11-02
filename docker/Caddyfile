@@ -1,0 +1,32 @@
+# APP_DOMAIN: dominio(s) públicos, separados por coma (HTTPS automático con
+# Let's Encrypt). Ej: "megaeliteoficial.com, www.megaeliteoficial.com".
+# Para pruebas locales sin HTTPS: APP_DOMAIN=:80
+{$APP_DOMAIN} {
+	# www.dominio → dominio
+	@www header_regexp www Host ^www\.(.+)$
+	redir @www https://{re.www.1}{uri} permanent
+
+	root * /var/www/html/public
+	encode zstd gzip
+
+	# Comprobantes y adjuntos pueden ser grandes.
+	request_body {
+		max_size 25MB
+	}
+
+	php_fastcgi app:9000
+	file_server
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options SAMEORIGIN
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+

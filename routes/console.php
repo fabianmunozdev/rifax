@@ -2,14 +2,18 @@
 
 use App\Actions\Purchases\ExpireReservationAction;
 use App\Actions\WhatsApp\SendPurchasePaymentReminderWhatsappAction;
+use App\Enums\PanelRole;
 use App\Models\Purchase;
 use App\Models\RaffleNumber;
 use App\Models\Reservation;
+use App\Models\User;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -36,7 +40,7 @@ app()->booted(function (): void {
                 try {
                     $expireReservationAction->execute($reservation);
                     $expired++;
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     Log::warning('Scheduler ExpireReservation: error individual reservation.', [
                         'reservation_id' => $reservation->id,
                         'purchase_id' => $reservation->purchase_id,
@@ -48,7 +52,7 @@ app()->booted(function (): void {
             if ($expired > 0) {
                 Log::info('Scheduler ExpireReservation executed.', ['expired_count' => $expired]);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Scheduler ExpireReservation fatal error.', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }
     })
@@ -75,13 +79,14 @@ app()->booted(function (): void {
             foreach ($dueReminders as $purchase) {
                 if ($purchase->customer === null) {
                     $skipped++;
+
                     continue;
                 }
 
                 try {
                     $paymentReminderAction->execute($purchase);
                     $sent++;
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $skipped++;
                     Log::warning('Scheduler PurchasePaymentReminder: reminder skipped.', [
                         'purchase_id' => $purchase->id,
@@ -97,7 +102,7 @@ app()->booted(function (): void {
                     'window' => ['from' => $windowStart->toIso8601String(), 'to' => $windowEnd->toIso8601String()],
                 ]);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Scheduler PurchasePaymentReminder fatal error.', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }
     })
@@ -133,7 +138,7 @@ app()->booted(function (): void {
                     ]);
                 }
             });
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Scheduler cleanup orphans fatal error.', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }
     })
@@ -142,3 +147,42 @@ app()->booted(function (): void {
         ->withoutOverlapping(10)
         ->onOneServer();
 });
+
+// Crea (o actualiza) un usuario administrador del panel.
+// Producción: docker compose -f compose.prod.yaml exec app php artisan rifax:create-admin
+Artisan::command('rifax:create-admin {email?} {--name=}', function (?string $email = null) {
+    $email = $email ?: $this->ask('Correo del administrador');
+    $validator = Validator::make(['email' => $email], ['email' => ['required', 'email']]);
+
+    if ($validator->fails()) {
+        $this->error('Correo inválido.');
+
+        return 1;
+    }
+
+    $name = $this->option('name') ?: $this->ask('Nombre', 'Administrador');
+    $password = $this->secret('Contraseña (mínimo 12 caracteres)');
+
+    if (mb_strlen((string) $password) < 12) {
+        $this->error('La contraseña debe tener al menos 12 caracteres.');
+
+        return 1;
+    }
+
+    if ($this->secret('Repite la contraseña') !== $password) {
+        $this->error('Las contraseñas no coinciden.');
+
+        return 1;
+    }
+
+    $user = User::query()->updateOrCreate(['email' => mb_strtolower($email)], [
+        'name' => $name,
+        'password' => Hash::make($password),
+        'role' => PanelRole::Admin->value,
+        'is_active' => true,
+    ]);
+
+    $this->info("Administrador listo: {$user->email}");
+
+    return 0;
+})->purpose('Crear o actualizar un administrador del panel');
