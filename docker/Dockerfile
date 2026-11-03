@@ -3,16 +3,16 @@
 # Imagen de producción de Rifax.
 #
 #   assets  → compila CSS/JS con Vite e instala Puppeteer (sin descargar Chrome)
-#   app     → PHP-FPM 8.4 + Chromium del sistema + Node (para boletos con Browsershot)
+#   app     → PHP-FPM 8.5 + Chromium del sistema + Node (para boletos con Browsershot)
 #   web     → Caddy con HTTPS automático, sirve /public y pasa PHP a "app"
 #
 # Construir:  docker compose -f compose.prod.yaml build
 
-ARG PHP_VERSION=8.4
-ARG NODE_VERSION=22
+ARG PHP_VERSION=8.5
+ARG NODE_VERSION=26
 
 ########################################################################
-FROM node:${NODE_VERSION}-bookworm-slim AS assets
+FROM node:${NODE_VERSION}-trixie-slim AS assets
 WORKDIR /app
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
     CI=true
@@ -27,10 +27,10 @@ COPY public ./public
 RUN pnpm build
 
 ########################################################################
-FROM node:${NODE_VERSION}-bookworm-slim AS node
+FROM node:${NODE_VERSION}-trixie-slim AS node
 
 ########################################################################
-FROM php:${PHP_VERSION}-fpm-bookworm AS app
+FROM php:${PHP_VERSION}-fpm-trixie AS app
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -38,11 +38,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq-dev libicu-dev libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
         unzip git ca-certificates postgresql-client \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" pdo_pgsql intl zip gd bcmath exif pcntl opcache \
+    && docker-php-ext-install -j"$(nproc)" pdo_pgsql intl zip gd bcmath exif pcntl \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apt-get purge -y --auto-remove libpq-dev libicu-dev libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
-    && apt-get install -y --no-install-recommends libpq5 libicu72 libzip4 libpng16-16 libjpeg62-turbo libfreetype6 \
+    && apt-get install -y --no-install-recommends libpq5 libicu76 libzip5 libpng16-16t64 libjpeg62-turbo libfreetype6 \
     && rm -rf /var/lib/apt/lists/* /tmp/pear
 
 # Node para que Browsershot ejecute Puppeteer (usa el Chromium del sistema).
@@ -80,6 +80,6 @@ ENTRYPOINT ["rifax-entrypoint"]
 CMD ["php-fpm"]
 
 ########################################################################
-FROM caddy:2-alpine AS web
+FROM caddy:2.11-alpine AS web
 COPY docker/Caddyfile /etc/caddy/Caddyfile
 COPY --from=app /var/www/html/public /var/www/html/public

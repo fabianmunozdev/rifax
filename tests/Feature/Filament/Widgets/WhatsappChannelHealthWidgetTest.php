@@ -4,6 +4,7 @@ namespace Tests\Feature\Filament\Widgets;
 
 use App\Filament\Widgets\WhatsappChannelHealthWidget;
 use App\Models\Customer;
+use App\Models\User;
 use App\Models\WhatsappMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -95,6 +96,8 @@ class WhatsappChannelHealthWidgetTest extends TestCase
 
         $this->assertSame('degraded', $health[0]);
         $this->assertSame('danger', $health[2]);
+
+        $this->actingAs(User::factory()->admin()->create());
 
         Livewire::test(WhatsappChannelHealthWidget::class)
             ->assertSee('WhatsApp channel health')
