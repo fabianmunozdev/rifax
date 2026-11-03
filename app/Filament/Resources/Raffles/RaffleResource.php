@@ -106,6 +106,12 @@ class RaffleResource extends BaseResource
                             ->required()
                             ->default(1)
                             ->minValue(1),
+                        TextInput::make('max_numbers_per_customer')
+                            ->label(__('admin.resources.raffles.fields.max_numbers_per_customer'))
+                            ->helperText(__('admin.resources.raffles.help.max_numbers_per_customer', ['default' => (int) config('rifax.purchases.max_held_numbers_per_customer', 100)]))
+                            ->numeric()
+                            ->nullable()
+                            ->minValue(1),
                         Toggle::make('random_selection_by_blocks')
                             ->label(__('admin.resources.raffles.fields.random_selection_by_blocks'))
                             ->helperText(__('admin.resources.raffles.help.random_selection_by_blocks'))
@@ -123,13 +129,13 @@ class RaffleResource extends BaseResource
                             ->image()
                             ->imageEditor()
                             ->maxSize(4096)
-                            ->helperText('Upload the raffle cover image. Replacing the file removes the previous image automatically.'),
+                            ->helperText('Sube la imagen de portada de la rifa. Si la reemplazas, la imagen anterior se borra.'),
                     ]),
                 Section::make(__('admin.resources.raffles.sections.lottery'))
                     ->columns(2)
                     ->schema([
                         TextInput::make('lottery_text')
-                            ->label('Texto loteria')
+                            ->label('Texto de la lotería')
                             ->maxLength(255),
                         TextInput::make('lottery_name')
                             ->label(__('admin.resources.raffles.fields.lottery'))
@@ -191,6 +197,9 @@ class RaffleResource extends BaseResource
                             ->label(__('admin.resources.raffles.fields.number_digits')),
                         TextEntry::make('min_numbers_per_purchase')
                             ->label(__('admin.resources.raffles.fields.min_numbers_per_purchase')),
+                        TextEntry::make('max_numbers_per_customer')
+                            ->label(__('admin.resources.raffles.fields.max_numbers_per_customer'))
+                            ->state(fn (Raffle $record): int => $record->maxHeldNumbersPerCustomer()),
                         TextEntry::make('random_selection_by_blocks')
                             ->label(__('admin.resources.raffles.fields.random_selection_by_blocks'))
                             ->badge()
@@ -212,7 +221,7 @@ class RaffleResource extends BaseResource
                     ->columns(2)
                     ->schema([
                         TextEntry::make('lottery_text')
-                            ->label('Texto loteria')
+                            ->label('Texto de la lotería')
                             ->placeholder('-'),
                         TextEntry::make('lottery_name')
                             ->label(__('admin.resources.raffles.fields.lottery'))
@@ -400,7 +409,9 @@ class RaffleResource extends BaseResource
 
     public static function getRelations(): array
     {
-        return [];
+        return [
+            RelationManagers\EarlyPrizesRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

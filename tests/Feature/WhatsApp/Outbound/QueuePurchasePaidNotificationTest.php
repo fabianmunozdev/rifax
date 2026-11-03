@@ -100,7 +100,7 @@ class QueuePurchasePaidNotificationTest extends TestCase
         $this->assertSame('payment_approved_ticket', data_get($outboundMessage->payload_json, 'template.name'));
         $this->assertSame($purchase->fresh('ticket')->ticket?->id, data_get($outboundMessage->payload_json, 'ticket_id'));
         $this->assertNotEmpty(data_get($outboundMessage->payload_json, 'template.components.0.parameters.2.text'));
-        $this->assertStringContainsString('/tickets/', (string) data_get($outboundMessage->payload_json, 'template.components.0.parameters.3.text'));
+        $this->assertStringContainsString('/boleto/', (string) data_get($outboundMessage->payload_json, 'template.components.0.parameters.3.text'));
 
         Queue::assertPushed(DispatchWhatsappMessageJob::class);
     }

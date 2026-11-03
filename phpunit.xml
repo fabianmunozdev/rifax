@@ -31,5 +31,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="WHATSAPP_WEBHOOK_VERIFY_TOKEN" value="rifax-test-token"/>
+        <env name="WHATSAPP_WEBHOOK_APP_SECRET" value="rifax-test-app-secret"/>
     </php>
 </phpunit>

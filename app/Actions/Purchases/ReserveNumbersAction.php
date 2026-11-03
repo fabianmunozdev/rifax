@@ -110,6 +110,13 @@ class ReserveNumbersAction
                     ]);
             }
 
+            // Tope por cliente: cuenta lo que ya tiene sin pagar en esta rifa (tras liberar la compra anterior).
+            $alreadyHeld = $raffle->heldNumbersCountFor($customer->id);
+
+            if ($alreadyHeld + $quantity > $raffle->maxHeldNumbersPerCustomer()) {
+                throw new InvalidArgumentException('The requested quantity exceeds the maximum numbers per customer for this raffle.');
+            }
+
             $numbers = RaffleNumber::query()
                 ->where('raffle_id', $raffle->id)
                 ->whereIn('number', $requestedNumbers)

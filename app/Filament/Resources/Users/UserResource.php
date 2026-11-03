@@ -35,13 +35,13 @@ class UserResource extends BaseResource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Access Control';
+    protected static string|UnitEnum|null $navigationGroup = 'Control de acceso';
 
     protected static ?int $navigationSort = 10;
 
     protected static ?string $navigationLabel = 'Users';
 
-    protected static ?string $modelLabel = 'User';
+    protected static ?string $modelLabel = 'Usuario';
 
     protected static ?string $pluralModelLabel = 'Users';
 
@@ -63,12 +63,9 @@ class UserResource extends BaseResource
                         Select::make('role')
                             ->options(PanelRole::options())
                             ->required(),
-                        Select::make('preferred_locale')
-                            ->label(__('admin.resources.users.fields.preferred_locale'))
-                            ->options(User::supportedPanelLocaleOptions())
-                            ->default('es')
-                            ->required()
-                            ->helperText(__('admin.resources.users.fields.preferred_locale_help')),
+                        // El panel es solo en español.
+                        \Filament\Forms\Components\Hidden::make('preferred_locale')
+                            ->default('es'),
                         Toggle::make('is_active')
                             ->label(__('admin.resources.users.fields.active_panel_access'))
                             ->default(true)
@@ -104,7 +101,7 @@ class UserResource extends BaseResource
                     ->copyable(),
                 TextColumn::make('role')
                     ->badge()
-                    ->formatStateUsing(fn (?string $state): string => PanelRole::tryFrom((string) $state)?->label() ?? 'Unassigned'),
+                    ->formatStateUsing(fn (?string $state): string => PanelRole::tryFrom((string) $state)?->label() ?? 'Sin asignar'),
                 IconColumn::make('is_active')
                     ->label(__('admin.resources.users.fields.active'))
                     ->boolean(),
@@ -123,8 +120,8 @@ class UserResource extends BaseResource
             ->recordActions([
                 EditAction::make(),
             ])
-            ->emptyStateHeading('No users found')
-            ->emptyStateDescription('Create admin, operator, finance or support accounts for the internal panel.')
+            ->emptyStateHeading('No hay usuarios')
+            ->emptyStateDescription('Crea cuentas de administración, operación, finanzas o soporte para el panel.')
             ->toolbarActions([]);
     }
 

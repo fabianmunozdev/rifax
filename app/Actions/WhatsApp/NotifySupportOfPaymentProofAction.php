@@ -35,9 +35,7 @@ class NotifySupportOfPaymentProofAction
         }
 
         $proof = $payment->proofs->first();
-        $proofUrl = $proof !== null && filled($proof->storage_path) && $proof->storage_disk === 'public'
-            ? asset('storage/'.$proof->storage_path)
-            : '-';
+        $proofUrl = $proof?->adminUrl() ?? '-';
 
         $supportCustomer = Customer::query()->firstOrCreate(
             ['phone' => $supportPhone],

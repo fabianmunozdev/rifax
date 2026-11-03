@@ -33,13 +33,13 @@ class AdminAuditLogResource extends BaseResource
 
     protected static ?int $navigationSort = 90;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Access Control';
+    protected static string|UnitEnum|null $navigationGroup = 'Control de acceso';
 
-    protected static ?string $navigationLabel = 'Audit logs';
+    protected static ?string $navigationLabel = 'Registros de auditoría';
 
-    protected static ?string $modelLabel = 'Audit log';
+    protected static ?string $modelLabel = 'Registro de auditoría';
 
-    protected static ?string $pluralModelLabel = 'Audit logs';
+    protected static ?string $pluralModelLabel = 'Registros de auditoría';
 
     public static function form(Schema $schema): Schema
     {
@@ -51,24 +51,24 @@ class AdminAuditLogResource extends BaseResource
     {
         return $schema
             ->components([
-                Section::make('Audit event')
+                Section::make('Evento')
                     ->columns(2)
                     ->schema([
                         TextEntry::make('event'),
                         TextEntry::make('action'),
                         TextEntry::make('user.name')
-                            ->label('User')
-                            ->placeholder('System'),
+                            ->label('Usuario')
+                            ->placeholder('Sistema'),
                         TextEntry::make('created_at')
                             ->dateTime(),
                         TextEntry::make('auditable_type')
-                            ->label('Entity type')
+                            ->label('Tipo de registro')
                             ->placeholder('-'),
                         TextEntry::make('auditable_id')
-                            ->label('Entity id')
+                            ->label('ID del registro')
                             ->placeholder('-'),
                     ]),
-                Section::make('Request context')
+                Section::make('Contexto de la solicitud')
                     ->schema([
                         TextEntry::make('ip_address')
                             ->placeholder('-'),
@@ -76,20 +76,20 @@ class AdminAuditLogResource extends BaseResource
                             ->placeholder('-')
                             ->columnSpanFull(),
                         TextEntry::make('context_json')
-                            ->label('Context')
+                            ->label('Contexto')
                             ->state(fn (AdminAuditLog $record): string => json_encode($record->context_json ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}')
                             ->copyable()
                             ->columnSpanFull(),
                     ]),
-                Section::make('Snapshots')
+                Section::make('Cambios')
                     ->schema([
                         TextEntry::make('before_json')
-                            ->label('Before')
+                            ->label('Antes')
                             ->state(fn (AdminAuditLog $record): string => json_encode($record->before_json ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}')
                             ->copyable()
                             ->columnSpanFull(),
                         TextEntry::make('after_json')
-                            ->label('After')
+                            ->label('Después')
                             ->state(fn (AdminAuditLog $record): string => json_encode($record->after_json ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}')
                             ->copyable()
                             ->columnSpanFull(),
@@ -109,15 +109,15 @@ class AdminAuditLogResource extends BaseResource
                 TextColumn::make('action')
                     ->badge(),
                 TextColumn::make('user.name')
-                    ->label('User')
-                    ->placeholder('System')
+                    ->label('Usuario')
+                    ->placeholder('Sistema')
                     ->searchable(),
                 TextColumn::make('auditable_type')
-                    ->label('Entity')
+                    ->label('Registro')
                     ->formatStateUsing(fn (?string $state): string => filled($state) ? class_basename($state) : '-')
                     ->toggleable(),
                 TextColumn::make('auditable_id')
-                    ->label('Entity id')
+                    ->label('ID del registro')
                     ->placeholder('-')
                     ->toggleable(),
             ])
@@ -131,15 +131,15 @@ class AdminAuditLogResource extends BaseResource
                         ->pluck('action', 'action')
                         ->all()),
                 Filter::make('system_events')
-                    ->label('System events')
+                    ->label('Eventos del sistema')
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->whereNull('user_id')),
             ])
             ->recordActions([
                 ViewAction::make(),
             ])
-            ->emptyStateHeading('No audit logs found')
-            ->emptyStateDescription('Critical admin actions appear here once they are executed from the panel.')
+            ->emptyStateHeading('No hay registros de auditoría')
+            ->emptyStateDescription('Las acciones importantes hechas desde el panel aparecen aquí.')
             ->toolbarActions([]);
     }
 

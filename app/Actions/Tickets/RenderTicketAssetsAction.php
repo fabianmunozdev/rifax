@@ -248,7 +248,7 @@ class RenderTicketAssetsAction
         mixed $purchase,
         Collection $numbers,
     ): array {
-        $publicUrl = $ticket->public_url ?: url('/tickets/'.$ticket->verification_token);
+        $publicUrl = $ticket->public_url ?: route('tickets.show', $ticket->verification_token);
         $metadataJson = $ticket->metadata_json ?? null;
         if (! is_array($metadataJson)) {
             $metadataJson = [];
@@ -315,7 +315,7 @@ class RenderTicketAssetsAction
         $ticketCode = $this->escape($ticket->code);
         $generatedAt = $this->escape($this->formatTicketGenerationDate($ticket->generated_at));
         $descriptionLines = $this->wrapTextForSvg($raffleDescription, 92);
-        $urlLines = $this->wrapTextForSvg((string) ($ticket->public_url ?: url('/tickets/'.$ticket->verification_token)), 94);
+        $urlLines = $this->wrapTextForSvg((string) ($ticket->public_url ?: route('tickets.show', $ticket->verification_token)), 94);
         $numberCardsSvg = '';
         $ticketUrlSvg = '';
         $perforationSvg = '';
@@ -410,7 +410,7 @@ SVG;
 
         $descriptionBlockSvg = implode("\n  ", $descriptionSvg ?? []);
         $numbersHeadingY = $gridTop - 16;
-        $publicUrlEscapedQr = $this->buildQrDataUri((string) ($ticket->public_url ?: url('/tickets/'.$ticket->verification_token)));
+        $publicUrlEscapedQr = $this->buildQrDataUri((string) ($ticket->public_url ?: route('tickets.show', $ticket->verification_token)));
 
         return <<<SVG
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="{$canvasHeight}" viewBox="0 0 1400 {$canvasHeight}" fill="none">
@@ -452,7 +452,7 @@ SVG;
         $primaryColor = $this->sanitizeColor($company?->primary_color, '#F59E0B');
         $secondaryColor = $this->sanitizeColor($company?->secondary_color, '#111827');
         $numbersText = $this->escape($numbers->map(fn (mixed $n) => $this->padNumber((string) $n, (int) ($raffle?->number_digits ?? 4)))->implode(', '));
-        $publicUrlEscapedQr = $this->buildQrDataUri((string) ($ticket->public_url ?: url('/tickets/'.$ticket->verification_token)));
+        $publicUrlEscapedQr = $this->buildQrDataUri((string) ($ticket->public_url ?: route('tickets.show', $ticket->verification_token)));
 
         return <<<SVG
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420" fill="none">

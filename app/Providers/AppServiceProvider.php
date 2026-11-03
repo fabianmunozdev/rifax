@@ -25,6 +25,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // El panel está en español: las etiquetas que Filament genera desde el nombre
+        // del campo ("Created at") se traducen con lang/es.json.
+        foreach ([
+            \Filament\Forms\Components\Field::class,
+            \Filament\Tables\Columns\Column::class,
+            \Filament\Tables\Filters\BaseFilter::class,
+            \Filament\Infolists\Components\Entry::class,
+            \Filament\Actions\Action::class,
+        ] as $component) {
+            $component::configureUsing(fn ($instance) => $instance->translateLabel());
+        }
     }
 }

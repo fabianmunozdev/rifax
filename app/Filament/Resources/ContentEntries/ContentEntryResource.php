@@ -41,30 +41,30 @@ class ContentEntryResource extends BaseResource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleLeftRight;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Configuration';
+    protected static string|UnitEnum|null $navigationGroup = 'Configuración';
 
     protected static ?int $navigationSort = 30;
 
-    protected static ?string $navigationLabel = 'Content Entries';
+    protected static ?string $navigationLabel = 'Entradas de contenido';
 
-    protected static ?string $modelLabel = 'Content entry';
+    protected static ?string $modelLabel = 'Entrada de contenido';
 
-    protected static ?string $pluralModelLabel = 'Content Entries';
+    protected static ?string $pluralModelLabel = 'Entradas de contenido';
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Section::make('Entry')
+                Section::make('Entrada')
                     ->columns(2)
                     ->schema([
                         Select::make('type')
                             ->options([
-                                'faq_fixed' => 'FAQ fixed',
-                                'faq_parametrized' => 'FAQ parametrized',
-                                'system_message' => 'System message',
-                                'support_message' => 'Support message',
-                                'template_bridge' => 'Template bridge',
+                                'faq_fixed' => 'Pregunta frecuente',
+                                'faq_parametrized' => 'Pregunta frecuente con variables',
+                                'system_message' => 'Mensaje del sistema',
+                                'support_message' => 'Mensaje de soporte',
+                                'template_bridge' => 'Plantilla de WhatsApp',
                             ])
                             ->required()
                             ->live()
@@ -76,7 +76,7 @@ class ContentEntryResource extends BaseResource
                         TextInput::make('key')
                             ->required()
                             ->maxLength(255)
-                            ->helperText('Must be unique per locale and channel.'),
+                            ->helperText('No puede repetirse en el mismo idioma y canal.'),
                         TextInput::make('title')
                             ->required()
                             ->maxLength(255),
@@ -97,9 +97,9 @@ class ContentEntryResource extends BaseResource
                             ->required(),
                         Select::make('status')
                             ->options([
-                                'draft' => 'Draft',
-                                'published' => 'Published',
-                                'archived' => 'Archived',
+                                'draft' => 'Borrador',
+                                'published' => 'Publicado',
+                                'archived' => 'Archivado',
                             ])
                             ->default('draft')
                             ->required(),
@@ -107,39 +107,39 @@ class ContentEntryResource extends BaseResource
                             ->required(fn (Get $get): bool => $get('type') === 'template_bridge')
                             ->maxLength(255)
                             ->helperText(fn (Get $get): string => $get('type') === 'template_bridge'
-                                ? 'Required for template bridges resolved by WhatsApp intent.'
-                                : 'Use the intent consumed by the WhatsApp flow when this entry should resolve by intent.'),
+                                ? 'Obligatorio en plantillas que se activan por intención de WhatsApp.'
+                                : 'Intención del flujo de WhatsApp que muestra esta entrada.'),
                         TextInput::make('priority')
                             ->numeric()
                             ->required()
                             ->default(100)
                             ->minValue(0),
                         Toggle::make('is_ai_eligible')
-                            ->label('AI eligible')
+                            ->label('Disponible para IA')
                             ->default(false)
                             ->disabled(fn (Get $get): bool => ! in_array($get('type'), ['faq_fixed', 'faq_parametrized'], true))
                             ->dehydrated(),
                         Toggle::make('is_public')
-                            ->label('Visible on public landing')
+                            ->label('Visible en la página pública')
                             ->default(false)
-                            ->helperText('Use this only for FAQ entries that should appear publicly on the landing page.')
+                            ->helperText('Actívalo solo en preguntas frecuentes que deben verse en la página pública.')
                             ->disabled(fn (Get $get): bool => ! in_array($get('type'), ['faq_fixed', 'faq_parametrized'], true))
                             ->dehydrated(),
                         DateTimePicker::make('published_at')
                             ->seconds(false)
-                            ->helperText('If status is published and this field is empty, the current time is stored automatically.'),
+                            ->helperText('Si el estado es Publicado y este campo está vacío, se guarda la fecha y hora actual.'),
                         Textarea::make('body_text')
                             ->required()
                             ->rows(8)
                             ->columnSpanFull(),
                         KeyValue::make('variables_json')
-                            ->label('Variables / config')
+                            ->label('Variables / configuración')
                             ->columnSpanFull()
                             ->reorderable()
                             ->required(fn (Get $get): bool => in_array($get('type'), ['faq_parametrized', 'template_bridge'], true))
                             ->helperText(fn (Get $get): string => in_array($get('type'), ['faq_parametrized', 'template_bridge'], true)
-                                ? 'Required for parametrized content and template bridges.'
-                                : 'For parametrized content or template bridges, store variables and delivery metadata here.'),
+                                ? 'Obligatorio en contenido con variables y plantillas.'
+                                : 'En contenido con variables o plantillas, guarda aquí las variables y datos de envío.'),
                         Textarea::make('fallback_text')
                             ->required(fn (Get $get): bool => in_array($get('type'), ['faq_parametrized', 'template_bridge'], true))
                             ->rows(4)
@@ -160,7 +160,7 @@ class ContentEntryResource extends BaseResource
                     ->sortable()
                     ->wrap(),
                 TextColumn::make('audience')
-                    ->label('Audience')
+                    ->label('Audiencia')
                     ->badge()
                     ->state(fn (ContentEntry $record): string => static::audienceLabel($record))
                     ->color(fn (ContentEntry $record): string => static::audienceColor($record))
@@ -169,25 +169,37 @@ class ContentEntryResource extends BaseResource
                     ->searchable()
                     ->copyable(),
                 TextColumn::make('type')
-                    ->badge(),
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => [
+                        'faq_fixed' => 'Pregunta frecuente',
+                        'faq_parametrized' => 'Pregunta frecuente con variables',
+                        'system_message' => 'Mensaje del sistema',
+                        'support_message' => 'Mensaje de soporte',
+                        'template_bridge' => 'Plantilla de WhatsApp',
+                    ][$state] ?? (string) $state),
                 TextColumn::make('status')
                     ->badge()
+                    ->formatStateUsing(fn (?string $state): string => [
+                        'draft' => 'Borrador',
+                        'published' => 'Publicado',
+                        'archived' => 'Archivado',
+                    ][$state] ?? (string) $state)
                     ->color(fn (string $state): string => match ($state) {
                         'published' => 'success',
                         'archived' => 'gray',
                         default => 'warning',
                     }),
                 TextColumn::make('trigger_intent')
-                    ->label('Intent')
+                    ->label('Intención')
                     ->searchable()
                     ->toggleable(),
                 TextColumn::make('priority')
                     ->sortable(),
                 IconColumn::make('is_ai_eligible')
-                    ->label('AI')
+                    ->label('IA')
                     ->boolean(),
                 IconColumn::make('is_public')
-                    ->label('Public')
+                    ->label('Pública')
                     ->boolean(),
                 TextColumn::make('updated_at')
                     ->dateTime()
@@ -197,11 +209,11 @@ class ContentEntryResource extends BaseResource
             ->defaultSort('priority')
             ->filters([
                 SelectFilter::make('audience')
-                    ->label('Audience')
+                    ->label('Audiencia')
                     ->options([
-                        'public_landing' => 'Public landing',
-                        'whatsapp_bot' => 'WhatsApp bot',
-                        'whatsapp_templates' => 'WhatsApp templates',
+                        'public_landing' => 'Página pública',
+                        'whatsapp_bot' => 'Bot de WhatsApp',
+                        'whatsapp_templates' => 'Plantillas de WhatsApp',
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         $value = $data['value'] ?? null;
@@ -222,24 +234,24 @@ class ContentEntryResource extends BaseResource
                     }),
                 SelectFilter::make('type')
                     ->options([
-                        'faq_fixed' => 'FAQ fixed',
-                        'faq_parametrized' => 'FAQ parametrized',
-                        'system_message' => 'System message',
-                        'support_message' => 'Support message',
-                        'template_bridge' => 'Template bridge',
+                        'faq_fixed' => 'Pregunta frecuente',
+                        'faq_parametrized' => 'Pregunta frecuente con variables',
+                        'system_message' => 'Mensaje del sistema',
+                        'support_message' => 'Mensaje de soporte',
+                        'template_bridge' => 'Plantilla de WhatsApp',
                     ]),
                 SelectFilter::make('status')
                     ->options([
-                        'draft' => 'Draft',
-                        'published' => 'Published',
-                        'archived' => 'Archived',
+                        'draft' => 'Borrador',
+                        'published' => 'Publicado',
+                        'archived' => 'Archivado',
                     ]),
                 Filter::make('with_trigger_intent')
-                    ->label('With trigger intent')
+                    ->label('Con intención')
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->whereNotNull('trigger_intent')),
                 Filter::make('public_entries')
-                    ->label('Public landing')
+                    ->label('Página pública')
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->where('is_public', true)),
             ])
@@ -247,8 +259,8 @@ class ContentEntryResource extends BaseResource
                 EditAction::make(),
                 DeleteAction::make(),
             ])
-            ->emptyStateHeading('No content entries found')
-            ->emptyStateDescription('Create the first FAQ, system message or template bridge for the WhatsApp channel.');
+            ->emptyStateHeading('No hay entradas de contenido')
+            ->emptyStateDescription('Crea la primera pregunta frecuente, mensaje del sistema o plantilla para el canal de WhatsApp.');
     }
 
     public static function getPages(): array
@@ -283,14 +295,14 @@ class ContentEntryResource extends BaseResource
     protected static function audienceLabel(ContentEntry $record): string
     {
         if ($record->is_public) {
-            return 'Public landing';
+            return 'Página pública';
         }
 
         if ($record->type === 'template_bridge') {
-            return 'WhatsApp templates';
+            return 'Plantillas de WhatsApp';
         }
 
-        return 'WhatsApp bot';
+        return 'Bot de WhatsApp';
     }
 
     protected static function audienceColor(ContentEntry $record): string

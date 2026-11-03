@@ -147,8 +147,8 @@ class PublicLandingTest extends TestCase
             ->assertSee('WhatsApp')
             ->assertSee('https://wa.me/573009998877?text=', escape: false)
             ->assertSee('https://wa.me/573001112233?text=PAGOS', escape: false)
-            ->assertSee('/raffles/rifa-landing/number-picker?quantity=1&amp;source=landing_featured&amp;utm_source=meta&amp;utm_medium=social&amp;utm_campaign=lanzamiento', escape: false)
-            ->assertSee('/raffles/rifa-landing/number-picker?quantity=1&amp;source=landing_sticky&amp;utm_source=meta&amp;utm_medium=social&amp;utm_campaign=lanzamiento', escape: false);
+            ->assertSee('/rifa/rifa-landing?quantity=1&amp;source=landing_featured&amp;utm_source=meta&amp;utm_medium=social&amp;utm_campaign=lanzamiento', escape: false)
+            ->assertSee('/rifa/rifa-landing?quantity=1&amp;source=landing_sticky&amp;utm_source=meta&amp;utm_medium=social&amp;utm_campaign=lanzamiento', escape: false);
     }
 
     public function test_it_hides_published_raffles_when_their_draw_time_has_already_started(): void

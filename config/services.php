@@ -38,8 +38,9 @@ return [
     'whatsapp' => [
         // Proveedor de transporte: 'meta' (Cloud API directa) o 'twilio'.
         'provider' => env('WHATSAPP_PROVIDER', 'meta'),
-        'webhook_verify_token' => env('WHATSAPP_WEBHOOK_VERIFY_TOKEN', 'rifax-test-token'),
-        'webhook_app_secret' => env('WHATSAPP_WEBHOOK_APP_SECRET', 'rifax-test-app-secret'),
+        // Sin valor por defecto: si faltan, el webhook de Meta rechaza todo (falla cerrado).
+        'webhook_verify_token' => (string) env('WHATSAPP_WEBHOOK_VERIFY_TOKEN', ''),
+        'webhook_app_secret' => (string) env('WHATSAPP_WEBHOOK_APP_SECRET', ''),
         'webhook_signature_header' => env('WHATSAPP_WEBHOOK_SIGNATURE_HEADER', 'X-Hub-Signature-256'),
         'webhook_rate_limit_max_attempts' => (int) env('WHATSAPP_WEBHOOK_RATE_LIMIT_MAX_ATTEMPTS', 120),
         'webhook_rate_limit_decay_seconds' => (int) env('WHATSAPP_WEBHOOK_RATE_LIMIT_DECAY_SECONDS', 60),

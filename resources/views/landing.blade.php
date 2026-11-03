@@ -193,6 +193,15 @@
         </div>
     </section>
 
+    {{-- 1b. Premios anticipados de la rifa destacada. --}}
+    @if ($featuredRaffle && $featuredRaffle->earlyPrizes->isNotEmpty())
+        <section class="section field-paper early-prizes-section">
+            <div class="wrap reveal">
+                @include('partials.early-prizes', ['raffle' => $featuredRaffle])
+            </div>
+        </section>
+    @endif
+
     {{-- 2. Cómo se compra, impreso como un recibo. --}}
     <section class="section field-surface" id="como-funciona">
         <div class="wrap grid">

@@ -4,6 +4,7 @@ namespace Tests\Feature\Filament\Widgets;
 
 use App\Filament\Widgets\RafflesNeedingAttentionWidget;
 use App\Models\Customer;
+use App\Models\User;
 use App\Models\Purchase;
 use App\Models\Raffle;
 use App\Models\Ticket;
@@ -75,6 +76,8 @@ class RafflesNeedingAttentionWidgetTest extends TestCase
             'provider_created_at' => now()->subMinutes(5),
             'provider_status_at' => now()->subMinutes(5),
         ]);
+
+        $this->actingAs(User::factory()->admin()->create());
 
         Livewire::test(RafflesNeedingAttentionWidget::class)
             ->assertSee('Raffles Needing Attention')
