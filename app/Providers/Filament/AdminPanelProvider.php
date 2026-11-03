@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Http\Middleware\SetAdminLocale;
+use Filament\FontProviders\GoogleFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -12,8 +13,6 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
-use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -32,19 +31,27 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('Rifax')
+            // Tinta para las acciones; el ámbar queda para avisos. Grises cálidos de papel.
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Stone,
+                'gray' => Color::Stone,
+                'warning' => Color::Amber,
+                'success' => Color::Green,
+                'danger' => Color::Red,
+                'info' => Color::Sky,
             ])
+            ->font('Barlow', provider: GoogleFontProvider::class)
+            ->favicon(asset('favicon.ico'))
+            ->spa()
+            ->sidebarCollapsibleOnDesktop()
+            ->unsavedChangesAlerts()
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
-            ->widgets([
-                AccountWidget::class,
-                FilamentInfoWidget::class,
-            ])
+            ->widgets([])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -63,6 +70,10 @@ class AdminPanelProvider extends PanelProvider
             ->persistentMiddleware([
                 SetAdminLocale::class,
             ])
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): string => '<link rel="stylesheet" href="'.asset('css/rifax-admin.css').'?v='.@filemtime(public_path('css/rifax-admin.css')).'">',
+            )
             ->renderHook(
                 PanelsRenderHook::TOPBAR_END,
                 fn (): \Illuminate\Contracts\View\View => View::make('filament.admin.locale-switcher'),

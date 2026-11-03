@@ -4,640 +4,164 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $raffle->title }} | Seleccion de numeros</title>
+    <title>{{ $raffle->title }} | Selección de números</title>
     @php
-        $brandPrimary = $company?->primary_color ?: '#0f766e';
-        $brandSecondary = $company?->secondary_color ?: '#0f172a';
-        $brandAccent = $company?->accent_color ?: '#2563eb';
-        $drawAtIso = $raffle->drawAt()?->toIso8601String();
+        $brandName = $company?->trade_name ?: config('app.name', 'Rifax');
+        $drawAt = $raffle->drawAt();
+        $drawAtIso = $drawAt?->toIso8601String();
+        $drawText = $drawAt
+            ? ($drawAt->copy()->locale('es')->translatedFormat('l j \\d\\e F')) . ', ' . $drawAt->format('g:i') . ' ' . ($drawAt->format('A') === 'AM' ? 'a. m.' : 'p. m.')
+            : null;
+        $money = fn ($value) => '$' . number_format((float) $value, 0, ',', '.');
+        $lottery = trim(($raffle->lottery_name ?: '') . ($raffle->lottery_draw_number ? ', sorteo ' . $raffle->lottery_draw_number : ''));
+        $hasConfirm = ($pickerConfirmUrl ?? '') !== '';
+        $accent = preg_match('/^#[0-9a-f]{6}$/i', (string) $company?->primary_color) ? $company->primary_color : '#bfb21a';
+        [$r, $g, $b] = sscanf($accent, '#%02x%02x%02x');
+        $accentInk = ((0.2126 * $r + 0.7152 * $g + 0.0722 * $b) / 255) > 0.55 ? '#181715' : '#f4f4f0';
     @endphp
-    <style>
-        :root {
-            color-scheme: dark;
-            --bg: #070b12;
-            --bg-elevated: #0b1220;
-            --card: #111926;
-            --card-strong: #0b1220;
-            --card-soft: #182233;
-            --surface-soft: rgba(255, 255, 255, 0.04);
-            --text: #f8fafc;
-            --muted: #94a3b8;
-            --border: rgba(255, 255, 255, 0.08);
-            --primary: {{ $brandPrimary }};
-            --secondary: {{ $brandSecondary }};
-            --accent: {{ $brandAccent }};
-            --primary-soft: color-mix(in srgb, var(--primary) 18%, rgba(255, 255, 255, 0.05));
-            --danger: #dc2626;
-            --disabled: #64748b;
-            --warning: #d97706;
-            --warning-soft: rgba(217, 119, 6, 0.16);
-            --paid: #1d4ed8;
-            --paid-soft: rgba(29, 78, 216, 0.16);
-            --winner: #7c3aed;
-            --winner-soft: rgba(124, 58, 237, 0.16);
-            --shadow: 0 22px 52px rgba(2, 6, 23, 0.38);
-            --whatsapp: #25d366;
-        }
-
-        * { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-        body {
-            margin: 0;
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background:
-                radial-gradient(circle at top left, color-mix(in srgb, var(--primary) 16%, transparent), transparent 34%),
-                radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 14%, transparent), transparent 28%),
-                linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
-                var(--bg);
-            color: var(--text);
-        }
-        .page {
-            max-width: 1320px;
-            margin: 0 auto;
-            padding: 24px 16px 56px;
-        }
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 22px;
-            box-shadow: var(--shadow);
-        }
-        .picker-shell {
-            display: grid;
-            gap: 20px;
-            padding: 20px;
-        }
-        .picker-header {
-            display: grid;
-            gap: 14px;
-            padding: 18px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 20px;
-            background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
-                linear-gradient(135deg, rgba(5, 10, 18, 0.98), color-mix(in srgb, var(--secondary) 54%, rgba(5, 10, 18, 0.96)) 55%, color-mix(in srgb, var(--primary) 22%, rgba(5, 10, 18, 0.94)) 100%);
-        }
-        .picker-header-bar {
-            display: grid;
-            gap: 12px;
-            align-items: center;
-        }
-        .picker-headline {
-            display: flex;
-            align-items: center;
-            min-width: 0;
-        }
-        .title {
-            margin: 0;
-            font-size: clamp(24px, 3vw, 32px);
-            line-height: 1.05;
-            letter-spacing: -0.025em;
-        }
-        .picker-copy,
-        .empty {
-            color: rgba(255, 255, 255, 0.92);
-            line-height: 1.5;
-            font-size: 12px;
-        }
-        .picker-copy {
-            margin: 0;
-        }
-        .picker-copy strong {
-            color: #fff;
-        }
-        .picker-meta {
-            display: grid;
-            gap: 3px;
-        }
-        .picker-countdown-wrap {
-            display: grid;
-            gap: 8px;
-            min-width: 0;
-        }
-        .picker-countdown-title {
-            color: rgba(255, 255, 255, 0.64);
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            text-align: left;
-        }
-        .picker-countdown {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 6px;
-        }
-        .picker-count-card {
-            padding: 8px 6px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            text-align: center;
-        }
-        .picker-count-value {
-            display: block;
-            font-size: 16px;
-            font-weight: 800;
-            line-height: 1;
-        }
-        .picker-count-label {
-            display: block;
-            margin-top: 4px;
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-        .summary {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-            color: var(--muted);
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .summary--compact {
-            margin: 0;
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.62);
-        }
-        .search-shell {
-            position: relative;
-        }
-        .search-shell input {
-            width: 100%;
-            min-height: 54px;
-            padding: 14px 18px;
-            border: 1px solid color-mix(in srgb, var(--primary) 34%, rgba(255, 255, 255, 0.12));
-            border-radius: 16px;
-            font-size: 15px;
-            font-weight: 600;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
-            color: var(--text);
-            outline: none;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-        }
-        .search-shell input::placeholder {
-            color: var(--muted);
-        }
-        .search-shell input:focus {
-            border-color: color-mix(in srgb, var(--primary) 62%, white);
-            box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
-        }
-        .legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin: 0;
-            padding: 0;
-            list-style: none;
-            color: var(--muted);
-            font-size: 12px;
-        }
-        .legend li {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .legend-swatch {
-            width: 12px;
-            height: 12px;
-            border-radius: 999px;
-            border: 1px solid var(--border);
-            background: var(--card-strong);
-        }
-        .legend-swatch--available {
-            background: color-mix(in srgb, var(--primary) 20%, rgba(255, 255, 255, 0.04));
-            border-color: color-mix(in srgb, var(--primary) 72%, white);
-        }
-        .legend-swatch--reserved {
-            background: var(--warning-soft);
-            border-color: var(--warning);
-        }
-        .legend-swatch--paid {
-            background: var(--paid-soft);
-            border-color: var(--paid);
-        }
-        .legend-swatch--winner {
-            background: var(--winner-soft);
-            border-color: var(--winner);
-        }
-        .numbers-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
-            gap: 8px;
-        }
-        .numbers-feed {
-            display: grid;
-            gap: 14px;
-        }
-        .number-button {
-            width: 100%;
-            border: 1px solid var(--border);
-            background: var(--card-strong);
-            border-radius: 12px;
-            padding: 10px 8px;
-            font-weight: 700;
-            font-size: 14px;
-            cursor: pointer;
-            color: var(--text);
-            transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
-        }
-        .number-button[data-status="available"] {
-            background: var(--card-strong);
-        }
-        .number-button:hover {
-            border-color: color-mix(in srgb, var(--primary) 68%, white);
-            transform: translateY(-1px);
-        }
-        .number-button.is-selected {
-            background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 86%, white), color-mix(in srgb, var(--accent) 68%, black));
-            border-color: transparent;
-            color: #fff;
-            box-shadow: 0 14px 28px color-mix(in srgb, var(--primary) 18%, transparent);
-        }
-        .number-button[data-status="reserved"] {
-            background: var(--warning-soft);
-            border-color: var(--warning);
-            color: #facc15;
-            cursor: not-allowed;
-        }
-        .number-button[data-status="paid"] {
-            background: var(--paid-soft);
-            border-color: var(--paid);
-            color: #bfdbfe;
-            cursor: not-allowed;
-        }
-        .number-button[data-status="winner"] {
-            background: var(--winner-soft);
-            border-color: var(--winner);
-            color: #ddd6fe;
-            cursor: not-allowed;
-        }
-        .number-button[data-status="reserved"]:hover,
-        .number-button[data-status="paid"]:hover,
-        .number-button[data-status="winner"]:hover {
-            transform: none;
-        }
-        .number-label {
-            display: block;
-        }
-        .number-state {
-            display: block;
-            margin-top: 4px;
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-        .actions {
-            position: sticky;
-            bottom: 12px;
-            margin-top: 8px;
-            display: grid;
-            gap: 8px;
-            padding: 12px;
-            align-items: start;
-            border: 1px solid color-mix(in srgb, var(--primary) 42%, rgba(255, 255, 255, 0.1));
-            border-radius: 18px;
-            background:
-                linear-gradient(135deg,
-                    color-mix(in srgb, var(--primary) 72%, #04101d) 0%,
-                    color-mix(in srgb, var(--secondary) 88%, #020617) 100%);
-            box-shadow:
-                0 18px 36px rgba(2, 6, 23, 0.34),
-                inset 0 1px 0 rgba(255, 255, 255, 0.08);
-            z-index: 20;
-        }
-        .actions-row,
-        .actions-foot {
-            display: grid;
-            gap: 8px;
-            min-width: 0;
-        }
-        .actions-foot {
-            gap: 4px;
-        }
-        .selection-preview {
-            min-height: 46px;
-            padding: 10px 14px;
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 14px;
-            background: rgba(3, 10, 24, 0.46);
-            color: rgba(255, 255, 255, 0.94);
-            display: flex;
-            align-items: center;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .feedback {
-            min-height: 16px;
-            color: rgba(255, 255, 255, 0.78);
-            font-size: 12px;
-            padding: 0 2px;
-        }
-        .feedback.is-error {
-            color: var(--danger);
-            font-weight: 600;
-        }
-        .cta-help {
-            color: rgba(255, 255, 255, 0.72);
-            font-size: 12px;
-            line-height: 1.4;
-            padding: 0 2px;
-        }
-        .cta {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-            width: 100%;
-            border: 1px solid rgba(37, 211, 102, 0.28);
-            border-radius: 14px;
-            padding: 10px 14px;
-            background: var(--whatsapp);
-            color: #fff;
-            font-size: 15px;
-            font-weight: 700;
-            text-decoration: none;
-            box-shadow: 0 14px 28px rgba(37, 211, 102, 0.18);
-            text-align: center;
-            white-space: nowrap;
-        }
-        .cta[aria-disabled="true"] {
-            pointer-events: none;
-            background: var(--disabled);
-            box-shadow: none;
-            border-color: transparent;
-        }
-        .cta-icon {
-            width: 18px;
-            height: 18px;
-            flex: 0 0 18px;
-        }
-        .warning {
-            color: var(--danger);
-            font-weight: 600;
-        }
-        .auth-banner {
-            border-radius: 14px;
-            padding: 14px 16px;
-            border: 1px solid transparent;
-            display: grid;
-            gap: 6px;
-        }
-        .auth-banner--ok {
-            background: rgba(14, 165, 233, 0.12);
-            border-color: rgba(14, 165, 233, 0.35);
-            color: rgba(255, 255, 255, 0.92);
-        }
-        .auth-banner--warn {
-            background: rgba(234, 179, 8, 0.14);
-            border-color: rgba(234, 179, 8, 0.4);
-            color: rgba(255, 255, 255, 0.92);
-        }
-        .auth-banner__title {
-            font-size: 14px;
-            font-weight: 700;
-            display: inline-flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: baseline;
-        }
-        .auth-banner__phone {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.78);
-            font-weight: 600;
-        }
-        .auth-banner__body {
-            font-size: 13px;
-            line-height: 1.5;
-            color: rgba(255, 255, 255, 0.8);
-        }
-        .auth-banner__hint {
-            display: inline-block;
-            margin-top: 4px;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 12px;
-        }
-        .section-stack {
-            display: grid;
-            gap: 18px;
-        }
-        .numbers-status {
-            min-height: 18px;
-            color: var(--muted);
-            font-size: 12px;
-        }
-        @media (min-width: 768px) {
-            .picker-header-bar { grid-template-columns: minmax(0, 1fr) 260px; align-items: start; }
-            .actions-row { grid-template-columns: minmax(0, 1fr) 320px; align-items: center; }
-        }
-        @media (max-width: 640px) {
-            .page {
-                padding-top: 18px;
-            }
-            .picker-shell {
-                padding: 16px;
-            }
-            .picker-header {
-                padding: 16px;
-            }
-            .numbers-grid {
-                grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
-            }
-        }
-    </style>
+    <meta name="theme-color" content="#181715">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/rifax.css') }}?v={{ @filemtime(public_path('css/rifax.css')) }}">
+    <style>:root { --accent: {{ $accent }}; --accent-ink: {{ $accentInk }}; }</style>
 </head>
 <body>
-    <div class="page">
-        <div class="card picker-shell">
-            <div class="picker-header">
-                <div class="picker-header-bar">
-                    <div class="picker-headline">
-                        <h1 class="title">{{ $raffle->title }}</h1>
-                    </div>
-
-                    <div class="picker-countdown-wrap">
-                        <span class="picker-countdown-title">Cuenta regresiva</span>
-                        <div class="picker-countdown" @if($drawAtIso) data-draw-at="{{ $drawAtIso }}" @endif>
-                            <div class="picker-count-card">
-                                <span class="picker-count-value" data-unit="days">--</span>
-                                <span class="picker-count-label">Dias</span>
-                            </div>
-                            <div class="picker-count-card">
-                                <span class="picker-count-value" data-unit="hours">--</span>
-                                <span class="picker-count-label">Horas</span>
-                            </div>
-                            <div class="picker-count-card">
-                                <span class="picker-count-value" data-unit="minutes">--</span>
-                                <span class="picker-count-label">Min</span>
-                            </div>
-                        </div>
-                    </div>
+<div class="main">
+    <section class="picker-hero field-night">
+        <div class="wrap">
+            <header class="bar">
+                <a class="bar-brand" href="{{ url('/') }}"><span>{{ $brandName }}</span></a>
+                <a class="link" href="{{ url('/') }}#raffles">Ver todas las rifas</a>
+            </header>
+            <div class="grid">
+                <div class="picker-title">
+                    <h1 class="head">{{ $raffle->title }}</h1>
+                    <p class="lead">
+                        Elige {{ $quantity }} {{ $quantity === 1 ? 'número' : 'números' }} de {{ $raffle->number_digits }} cifras, a {{ $money($raffle->price_per_number) }} cada uno.
+                        @if ($lottery !== '') Se juega con la {{ $lottery }}. @endif
+                    </p>
+                </div>
+                <div class="picker-clock" @if($drawAtIso) data-countdown data-draw-at="{{ $drawAtIso }}" @endif>
+                    @if ($drawText)
+                        <p class="picker-clock-value num">Faltan <span data-countdown-text>…</span></p>
+                        <p class="muted">Sorteo el {{ $drawText }}</p>
+                    @else
+                        <p class="muted">Fecha de sorteo pendiente de configuración.</p>
+                    @endif
                 </div>
             </div>
+        </div>
+    </section>
 
-            <div class="picker-meta">
-                <p class="picker-copy">
-                    Elige exactamente <strong>{{ $quantity }}</strong> número(s) disponibles y continua la compra por WhatsApp con una selección temporal que el bot reconocerá automáticamente.
-                </p>
-
-                <div class="summary summary--compact">
-                    @if ($raffle->draw_date || $raffle->draw_time)
-                        <span>Sorteo {{ $raffle->draw_date?->format('Y-m-d') ?: 'Pendiente' }} {{ $raffle->draw_time ?: '' }}</span>
-                    @else
-                        <span>Fecha de sorteo pendiente de configuración.</span>
-                    @endif
-                    <span>Catálogo total: {{ number_format((int) $catalogCount) }}</span>
-                    <span>Disponibles ahora: {{ number_format((int) $availableCount) }}</span>
-                    <span id="selection-status">0 seleccionados de {{ $quantity }}</span>
-                </div>
+    <section class="picker-body field-paper">
+        <div class="wrap">
+            <div class="picker-summary num">
+                <span><strong>Disponibles ahora: {{ number_format((int) $availableCount, 0, ',', '.') }}</strong></span>
+                <span>Catálogo total: {{ number_format((int) $catalogCount, 0, ',', '.') }}</span>
+                <span>Tienes {{ (int) ($raffle->reservation_timeout_minutes ?: 15) }} minutos para pagar después de reservar.</span>
             </div>
 
             @if (isset($pickerAuthCustomer) && $pickerAuthCustomer instanceof \App\Models\Customer)
                 @php
-                    $phoneRaw = (string) ($pickerAuthCustomer->phone ?? '');
-                    $phoneDigits = preg_replace('/\D+/', '', $phoneRaw) ?: '';
-                    $phoneMask = $phoneDigits !== ''
-                        ? '+'.substr($phoneDigits, 0, 2).' '.substr($phoneDigits, 2, 3).'***'.substr($phoneDigits, -4)
-                        : '';
+                    $phoneDigits = preg_replace('/\D+/', '', (string) ($pickerAuthCustomer->phone ?? '')) ?: '';
+                    $phoneMask = $phoneDigits !== '' ? '+'.substr($phoneDigits, 0, 2).' '.substr($phoneDigits, 2, 3).'***'.substr($phoneDigits, -4) : '';
                 @endphp
-                <div class="auth-banner auth-banner--ok" role="status">
-                    <div class="auth-banner__title">
-                        Confirmando como <strong>{{ $pickerAuthCustomer->name ?: 'Cliente' }}</strong>
-                        @if ($phoneMask !== '')
-                            <span class="auth-banner__phone">({{ $phoneMask }})</span>
-                        @endif
-                    </div>
-                    <div class="auth-banner__body">
-                        Tu selección se reservará automáticamente y recibirás la confirmación y los datos de pago directamente por este WhatsApp.
-                        <br>
-                        <span class="auth-banner__hint">Si no eres esta persona, cierra esta ventana y escribe HOLA al bot para generar tu enlace personalizado.</span>
-                    </div>
+                <div class="notice notice-ok" role="status">
+                    <p><strong>Confirmando como {{ $pickerAuthCustomer->name ?: 'Cliente' }}</strong>@if ($phoneMask !== '') ({{ $phoneMask }})@endif</p>
+                    <p>Tu selección se reserva al confirmar y te llegan los datos de pago por este WhatsApp.</p>
+                    <p class="small">Si no eres esta persona, cierra esta ventana y escribe HOLA al bot para recibir tu propio enlace.</p>
                 </div>
             @elseif (isset($pickerAuthError) && is_string($pickerAuthError) && $pickerAuthError !== '')
-                <div class="auth-banner auth-banner--warn" role="alert">
-                    <div class="auth-banner__title">Enlace de confirmación inválido o expirado</div>
-                    <div class="auth-banner__body">
-                        {{ $pickerAuthError }}
-                    </div>
+                <div class="notice notice-warn" role="alert">
+                    <p><strong>Enlace de confirmación inválido o expirado</strong></p>
+                    <p>{{ $pickerAuthError }}</p>
                 </div>
             @endif
 
             @if (! $botPhoneDigits)
-                <p class="warning">No hay un número de WhatsApp del bot configurado en administración. Configura `whatsapp_bot_phone` para habilitar el flujo web hacia WhatsApp.</p>
+                <div class="notice notice-warn" role="alert">
+                    <p>No hay un número de WhatsApp del bot configurado en administración. Configura <strong>whatsapp_bot_phone</strong> para habilitar el flujo web hacia WhatsApp.</p>
+                </div>
             @endif
 
             @if ($numbers === [])
-                <p class="empty">Esta rifa aún no tiene números cargados.</p>
+                <p class="notice">Esta rifa aún no tiene números cargados.</p>
             @else
-                <div class="section-stack">
-                    <div class="search-shell">
-                        <input type="search" id="number-search" placeholder="Buscar número..." autocomplete="off">
+                <div class="picker-tools">
+                    <div class="picker-search">
+                        <label class="visually-hidden" for="number-search">Buscar número</label>
+                        <input type="search" id="number-search" inputmode="numeric" placeholder="Buscar número…" autocomplete="off">
                     </div>
-
                     <ul class="legend" aria-label="Estados de números">
                         <li><span class="legend-swatch legend-swatch--available"></span>Disponible</li>
+                        <li><span class="legend-swatch legend-swatch--selected"></span>Tu selección</li>
                         <li><span class="legend-swatch legend-swatch--reserved"></span>Reservado</li>
                         <li><span class="legend-swatch legend-swatch--paid"></span>Pagado</li>
                         <li><span class="legend-swatch legend-swatch--winner"></span>Ganador</li>
                     </ul>
+                </div>
 
-                    <div class="numbers-feed">
-                    <div
-                        class="numbers-grid"
-                        id="numbers-grid"
-                        data-quantity="{{ $quantity }}"
-                        data-feed-url="{{ $numbersFeedUrl }}"
-                        data-next-cursor="{{ $numbersNextCursor ?? '' }}"
-                    >
+                <div class="numbers-feed">
+                    <div class="numbers-grid" id="numbers-grid"
+                         data-quantity="{{ $quantity }}"
+                         data-feed-url="{{ $numbersFeedUrl }}"
+                         data-next-cursor="{{ $numbersNextCursor ?? '' }}">
                         @foreach ($numbers as $number)
-                            @php
-                                $isSelectable = ($number['selectable'] ?? false) === true;
-                            @endphp
-                            <button
-                                type="button"
-                                class="number-button"
-                                data-number="{{ $number['number'] }}"
-                                data-status="{{ $number['status'] }}"
-                                aria-pressed="false"
-                                @disabled(! $isSelectable)
-                            >
+                            <button type="button" class="number-button"
+                                    data-number="{{ $number['number'] }}"
+                                    data-status="{{ $number['status'] }}"
+                                    aria-pressed="false"
+                                    @disabled(($number['selectable'] ?? false) !== true)>
                                 <span class="number-label">{{ $number['number'] }}</span>
                                 <span class="number-state">{{ $number['status_label'] }}</span>
                             </button>
                         @endforeach
                     </div>
-                        <div class="numbers-status" id="numbers-status" aria-live="polite"></div>
-                        <div id="numbers-sentinel" aria-hidden="true"></div>
-                    </div>
-
-                    <div class="actions">
-                        <div class="actions-row">
-                            <div class="selection-preview" id="selection-preview">
-                                Aún no has seleccionado números.
-                            </div>
-                            <a
-                                id="send-selection-link"
-                                class="cta"
-                                href="#"
-                                aria-disabled="true"
-                                data-phone="{{ $botPhoneDigits }}"
-                                data-intent-url="{{ $pickerIntentUrl }}"
-                                data-confirm-url="{{ $pickerConfirmUrl ?? '' }}"
-                                data-picker-trace='@json($pickerTrace)'
-                            >
-                                <svg class="cta-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-                                    <path d="M19.05 4.91A9.82 9.82 0 0 0 12.03 2C6.57 2 2.12 6.42 2.12 11.88c0 1.75.46 3.46 1.34 4.97L2 22l5.3-1.39a9.9 9.9 0 0 0 4.73 1.21h.01c5.46 0 9.88-4.42 9.88-9.88a9.8 9.8 0 0 0-2.87-7.03Zm-7.02 15.24h-.01a8.2 8.2 0 0 1-4.18-1.14l-.3-.18-3.15.83.84-3.07-.2-.32a8.16 8.16 0 0 1-1.25-4.38c0-4.5 3.67-8.16 8.19-8.16a8.1 8.1 0 0 1 5.78 2.4 8.12 8.12 0 0 1 2.38 5.78c0 4.51-3.67 8.17-8.1 8.24Zm4.48-6.13c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.01-.37-1.92-1.19-.71-.63-1.19-1.4-1.33-1.64-.14-.24-.02-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.31-.74-1.8-.2-.47-.4-.4-.54-.4h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.68 2.56 4.07 3.59.57.25 1.01.4 1.36.52.57.18 1.08.15 1.48.09.45-.07 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z"/>
-                                </svg>
-                                <span class="cta-label">{{ ($pickerConfirmUrl ?? '') !== '' ? 'Confirmar mi selección' : 'Continuar compra por WhatsApp' }}</span>
-                            </a>
-                        </div>
-                        <div class="actions-foot">
-                            <div class="cta-help" id="cta-help-text">
-                                {{ ($pickerConfirmUrl ?? '') !== ''
-                                    ? 'Confirma tus números y la reserva se crea automáticamente. Recibirás todo por WhatsApp.'
-                                    : 'Se abrirá un mensaje de WhatsApp listo para enviar. No necesitas editarlo.' }}
-                            </div>
-                            <div class="feedback" id="selection-feedback" aria-live="polite"></div>
-                        </div>
-                    </div>
+                    <div class="numbers-status" id="numbers-status" aria-live="polite"></div>
+                    <div id="numbers-sentinel" aria-hidden="true"></div>
                 </div>
             @endif
         </div>
+    </section>
+</div>
+
+@if ($numbers !== [])
+    <div class="picker-bar">
+        <div class="wrap picker-bar-inner">
+            <div class="picker-bar-text">
+                <p class="picker-bar-count num" id="selection-status">0 seleccionados de {{ $quantity }}</p>
+                <p class="picker-bar-help" id="selection-preview">Aún no has seleccionado números.</p>
+                <p class="picker-bar-help" id="cta-help-text">{{ $hasConfirm
+                    ? 'Confirma tus números y la reserva se crea automáticamente. Recibirás todo por WhatsApp.'
+                    : 'Se abrirá un mensaje de WhatsApp listo para enviar. No necesitas editarlo.' }}</p>
+                <p class="feedback" id="selection-feedback" aria-live="polite"></p>
+            </div>
+            <a id="send-selection-link" class="btn btn-accent cta" href="#" aria-disabled="true"
+               data-phone="{{ $botPhoneDigits }}"
+               data-intent-url="{{ $pickerIntentUrl }}"
+               data-confirm-url="{{ $pickerConfirmUrl ?? '' }}"
+               data-picker-trace='@json($pickerTrace)'>
+                <span class="cta-label">{{ $hasConfirm ? 'Confirmar mi selección' : 'Continuar compra por WhatsApp' }}</span>
+            </a>
+        </div>
     </div>
+@endif
 
     <script>
         (() => {
-            const countdowns = Array.from(document.querySelectorAll('.picker-countdown[data-draw-at]'));
-
-            const renderCountdown = (container) => {
-                const drawAt = container.dataset.drawAt;
-
-                if (!drawAt) {
-                    return;
-                }
-
-                const diff = new Date(drawAt).getTime() - Date.now();
-                const safeDiff = Math.max(diff, 0);
-                const days = Math.floor(safeDiff / 86400000);
-                const hours = Math.floor((safeDiff % 86400000) / 3600000);
-                const minutes = Math.floor((safeDiff % 3600000) / 60000);
-
-                container.querySelector('[data-unit="days"]').textContent = String(days).padStart(2, '0');
-                container.querySelector('[data-unit="hours"]').textContent = String(hours).padStart(2, '0');
-                container.querySelector('[data-unit="minutes"]').textContent = String(minutes).padStart(2, '0');
+            // Cuenta regresiva en palabras.
+            const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+            const el = document.querySelector('[data-countdown][data-draw-at]');
+            if (!el) return;
+            const render = () => {
+                const diff = Math.max(new Date(el.dataset.drawAt).getTime() - Date.now(), 0);
+                const d = Math.floor(diff / 86400000), h = Math.floor((diff % 86400000) / 3600000), m = Math.floor((diff % 3600000) / 60000);
+                el.querySelector('[data-countdown-text]').textContent = diff === 0 ? 'unos instantes'
+                    : d > 0 ? `${plural(d, 'día', 'días')} y ${plural(h, 'hora', 'horas')}` : `${plural(h, 'hora', 'horas')} y ${plural(m, 'minuto', 'minutos')}`;
             };
-
-            countdowns.forEach(renderCountdown);
-
-            if (countdowns.length > 0) {
-                window.setInterval(() => countdowns.forEach(renderCountdown), 1000);
-            }
+            render();
+            setInterval(render, 30000);
         })();
 
         (() => {
@@ -981,6 +505,37 @@
 
             setNumbersStatus(nextCursor !== '' ? 'Desliza para cargar más números.' : '');
             sync();
+
+            // Número que llega desde la portada (?pick=0042): se aparta si sigue libre.
+            const picks = (new URLSearchParams(window.location.search).get('pick') || '')
+                .split(',').map((v) => v.replace(/\D+/g, '')).filter(Boolean).slice(0, requiredQuantity);
+            if (picks.length > 0 && feedUrl) {
+                (async () => {
+                    for (const pick of picks) {
+                        try {
+                            const response = await fetch(`${feedUrl}?${new URLSearchParams({ search: pick, per_page: '24' })}`, { headers: { Accept: 'application/json' } });
+                            const payload = await response.json();
+                            const digits = String((payload.items || [])[0]?.number || '').length || pick.length;
+                            const target = (payload.items || []).find((item) => item.number === pick.padStart(digits, '0'));
+                            if (!target) continue;
+                            if (!renderedNumbers.has(target.number)) {
+                                grid.prepend(buildNumberButton(target));
+                                renderedNumbers.add(target.number);
+                            }
+                            if (target.selectable && selected.size < requiredQuantity) {
+                                selected.add(target.number);
+                                const button = grid.querySelector(`[data-number="${target.number}"]`);
+                                button?.classList.add('is-selected');
+                                button?.setAttribute('aria-pressed', 'true');
+                                setFeedback(`Apartamos el ${target.number} en tu selección.`);
+                            } else if (!target.selectable) {
+                                setFeedback(`El ${target.number} ya no está libre. Elige otro.`, true);
+                            }
+                        } catch (_) { /* sin conexión: el cliente elige a mano */ }
+                    }
+                    sync();
+                })();
+            }
         })();
     </script>
 </body>

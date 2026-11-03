@@ -1,0 +1,51 @@
+/*
+ * Ajustes del panel Filament (sin compilar un tema): un solo radio, sin sombras,
+ * barra superior en el mismo fondo, números tabulares y tarjetas de métricas
+ * sin decoración. Funciona en modo claro y oscuro.
+ */
+
+/* Un solo radio para paneles, tablas y tarjetas. */
+.fi-section.fi-section-contained,
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat,
+.fi-fo-field-wrp .fi-input-wrp,
+.fi-in-entry-wrp,
+.fi-dropdown-panel,
+.fi-modal-window { border-radius: 8px !important; }
+.fi-btn, .fi-input-wrp, .fi-select-input, .fi-tabs-item { border-radius: 6px !important; }
+
+/* Sin sombras en lo que está quieto; el borde de 1px separa las superficies. */
+.fi-section, .fi-ta-ctn, .fi-wi-stats-overview-stat, .fi-topbar, .fi-sidebar, .fi-btn { box-shadow: none !important; }
+.fi-ta-ctn, .fi-wi-stats-overview-stat, .fi-section.fi-section-contained {
+    --tw-ring-color: var(--gray-200) !important;
+}
+.dark .fi-ta-ctn, .dark .fi-wi-stats-overview-stat, .dark .fi-section.fi-section-contained {
+    --tw-ring-color: color-mix(in oklab, white 8%, transparent) !important;
+}
+
+/* Barra superior en el fondo de la página, separada por una línea suave. */
+.fi-topbar, .fi-topbar > nav { background-color: transparent !important; }
+.fi-topbar { border-bottom: 1px solid var(--gray-200); }
+.dark .fi-topbar { border-bottom-color: color-mix(in oklab, white 8%, transparent); }
+.fi-topbar { backdrop-filter: none !important; }
+
+/* Métricas: el número manda; la descripción en gris; sin mini gráficos planos. */
+.fi-wi-stats-overview-stat-chart { display: none !important; }
+.fi-wi-stats-overview-stat-description,
+.fi-wi-stats-overview-stat-description-icon { color: var(--gray-600) !important; }
+.dark .fi-wi-stats-overview-stat-description,
+.dark .fi-wi-stats-overview-stat-description-icon { color: var(--gray-400) !important; }
+.fi-wi-stats-overview-stat-value { letter-spacing: -0.01em; }
+
+/* Cifras alineadas en tablas, métricas y detalles. */
+.fi-ta-text, .fi-ta-cell, .fi-wi-stats-overview-stat-value, .fi-in-text, .fi-badge {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Títulos de página a tamaño de aplicación, no de cartel. */
+.fi-header-heading { font-size: 1.625rem !important; line-height: 1.2 !important; letter-spacing: -0.01em; }
+
+/* El menú lateral: etiquetas legibles y el activo marcado solo por tono. */
+.fi-sidebar-item-label { font-size: 0.9375rem; }
+.fi-sidebar-group-label { text-transform: none !important; letter-spacing: 0 !important; }
+.fi-wi-stats-overview-stat-description svg { color: inherit !important; }

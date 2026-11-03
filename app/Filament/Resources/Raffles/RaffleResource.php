@@ -274,16 +274,23 @@ class RaffleResource extends BaseResource
         return $table
             ->columns([
                 TextColumn::make('id')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 ImageColumn::make('cover_image_path')
-                    ->label('Cover')
+                    ->label(__('admin.resources.raffles.fields.cover'))
                     ->disk('public')
                     ->square()
                     ->imageSize(52)
                     ->toggleable(),
+                // La columna que identifica la fila se lleva el ancho; la lotería va debajo.
                 TextColumn::make('title')
                     ->label(__('admin.resources.raffles.fields.title'))
                     ->searchable()
+                    ->weight('medium')
+                    ->description(fn (Raffle $record): ?string => filled($record->lottery_name)
+                        ? trim($record->lottery_name.($record->lottery_draw_number ? ' #'.$record->lottery_draw_number : ''))
+                        : null)
+                    ->extraHeaderAttributes(['style' => 'min-width: 16rem'])
                     ->wrap(),
                 TextColumn::make('status')
                     ->label(__('admin.resources.raffles.fields.status'))
@@ -302,11 +309,13 @@ class RaffleResource extends BaseResource
                 TextColumn::make('draw_date')
                     ->label(__('admin.resources.raffles.fields.draw_date'))
                     ->date()
+                    ->description(fn (Raffle $record): ?string => $record->draw_time ? substr((string) $record->draw_time, 0, 5) : null)
                     ->sortable(),
                 TextColumn::make('number_digits')
                     ->label(__('admin.resources.raffles.fields.digits'))
+                    ->alignEnd()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('random_selection_by_blocks')
                     ->label(__('admin.resources.raffles.fields.random_selection_by_blocks_short'))
                     ->badge()
@@ -315,10 +324,10 @@ class RaffleResource extends BaseResource
                         : __('admin.common.no'))
                     ->color(fn (bool $state): string => $state ? 'success' : 'gray')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('draw_time')
                     ->label(__('admin.resources.raffles.fields.draw_time'))
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('result_number')
                     ->label(__('admin.resources.raffles.fields.result'))
                     ->placeholder('-')
@@ -328,27 +337,37 @@ class RaffleResource extends BaseResource
                     ->placeholder('-'),
                 TextColumn::make('numbers_count')
                     ->label(__('admin.resources.raffles.fields.numbers'))
+                    ->numeric()
+                    ->alignEnd()
                     ->sortable(),
                 TextColumn::make('paid_numbers_count')
                     ->label(__('admin.resources.raffles.fields.paid'))
+                    ->numeric()
+                    ->alignEnd()
                     ->sortable(),
                 TextColumn::make('purchases_count')
                     ->label(__('admin.resources.raffles.fields.purchases'))
+                    ->numeric()
+                    ->alignEnd()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('pending_purchases_count')
                     ->label(__('admin.resources.raffles.fields.pending_purchases_short'))
+                    ->numeric()
+                    ->alignEnd()
                     ->sortable()
                     ->toggleable(),
                 TextColumn::make('paid_purchases_count')
                     ->label(__('admin.resources.raffles.fields.paid_purchases'))
+                    ->numeric()
+                    ->alignEnd()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('result_published_at')
                     ->label(__('admin.resources.raffles.fields.result_published_at'))
                     ->dateTime()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('is_featured', 'desc')
             ->filters([
