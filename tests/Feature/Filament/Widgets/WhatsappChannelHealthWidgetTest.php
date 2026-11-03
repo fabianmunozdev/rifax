@@ -99,7 +99,7 @@ class WhatsappChannelHealthWidgetTest extends TestCase
         Livewire::test(WhatsappChannelHealthWidget::class)
             ->assertSee('WhatsApp channel health')
             ->assertSee('Channel status')
-            ->assertSee('Meta sent (24h)')
+            ->assertSee('Sent (24h)')
             ->assertSee('Delivered (24h)')
             ->assertSee('Read (24h)')
             ->assertSee('Failed (24h)')
