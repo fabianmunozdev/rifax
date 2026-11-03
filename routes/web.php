@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\PaymentProofController;
 use App\Http\Controllers\AdminLocaleController;
 use App\Http\Controllers\PublicLandingController;
 use App\Http\Controllers\RaffleNumberPickerController;
@@ -43,3 +44,7 @@ Route::get('/', PublicLandingController::class)
 
 Route::middleware('auth')->post('/admin/preferences/locale', AdminLocaleController::class)
     ->name('admin.locale.update');
+
+// Comprobantes de pago: privados, solo para usuarios del panel con permiso de ver pagos.
+Route::get('/admin/comprobantes/{paymentProof}', [PaymentProofController::class, 'show'])
+    ->name('admin.payment-proofs.show');

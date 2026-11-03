@@ -30,7 +30,10 @@ class RaffleNumberPickerController extends Controller
         abort_unless($raffle->salesAreOpen(), 404);
 
         $trace = $this->resolvePickerTrace($request);
-        $quantity = max($raffle->min_numbers_per_purchase, (int) $request->integer('quantity', $raffle->min_numbers_per_purchase));
+        $quantity = min(
+            $raffle->maxHeldNumbersPerCustomer(),
+            max($raffle->min_numbers_per_purchase, (int) $request->integer('quantity', $raffle->min_numbers_per_purchase)),
+        );
         $company = CompanySetting::query()->first();
         $botPhone = $company?->whatsapp_bot_phone;
         $catalogCount = $raffle->numbers()->count();
@@ -61,6 +64,8 @@ class RaffleNumberPickerController extends Controller
                 'utm_term' => $trace['utm_term'],
             ], fn (mixed $value): bool => $value !== null && $value !== ''))
             : null;
+
+        $raffle->loadMissing('earlyPrizes.winnerPurchase.customer');
 
         return view('raffles.number-picker', [
             'raffle' => $raffle,
@@ -145,6 +150,12 @@ class RaffleNumberPickerController extends Controller
         ]);
 
         $quantity = max($raffle->min_numbers_per_purchase, (int) $validated['quantity']);
+
+        if ($quantity > $raffle->maxHeldNumbersPerCustomer()) {
+            return response()->json([
+                'message' => "El máximo por persona en esta rifa es {$raffle->maxHeldNumbersPerCustomer()} número(s).",
+            ], 422);
+        }
         $digits = $raffle->normalizedNumberDigits();
         $selectedNumbers = collect($validated['selected_numbers'])
             ->map(fn (string $number): string => trim($number))
@@ -263,6 +274,12 @@ class RaffleNumberPickerController extends Controller
         ]);
 
         $quantity = max($raffle->min_numbers_per_purchase, (int) $validated['quantity']);
+
+        if ($quantity > $raffle->maxHeldNumbersPerCustomer()) {
+            return response()->json([
+                'message' => "El máximo por persona en esta rifa es {$raffle->maxHeldNumbersPerCustomer()} número(s).",
+            ], 422);
+        }
         $digits = $raffle->normalizedNumberDigits();
         $selectedNumbers = collect($validated['selected_numbers'])
             ->map(fn (string $n): string => trim($n))

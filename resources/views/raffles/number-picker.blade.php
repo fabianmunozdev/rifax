@@ -41,6 +41,9 @@
                         Elige {{ $quantity }} {{ $quantity === 1 ? 'número' : 'números' }} de {{ $raffle->number_digits }} cifras, a {{ $money($raffle->price_per_number) }} cada uno.
                         @if ($lottery !== '') Se juega con la {{ $lottery }}. @endif
                     </p>
+                    @if ($raffle->earlyPrizes->isNotEmpty())
+                        <p><a class="link" href="#premios-anticipados">Además, {{ $raffle->earlyPrizes->count() === 1 ? '1 premio anticipado' : $raffle->earlyPrizes->count().' premios anticipados' }} antes del sorteo</a></p>
+                    @endif
                 </div>
                 <div class="picker-clock" @if($drawAtIso) data-countdown data-draw-at="{{ $drawAtIso }}" @endif>
                     @if ($drawText)
@@ -53,6 +56,15 @@
             </div>
         </div>
     </section>
+
+    @if ($raffle->earlyPrizes->isNotEmpty())
+        {{-- Arriba y plegable: la cuadrícula carga números sin fin, así que nada debajo de ella se alcanza. --}}
+        <section class="field-surface early-prizes-fold-section">
+            <div class="wrap">
+                @include('partials.early-prizes', ['raffle' => $raffle, 'collapsible' => true])
+            </div>
+        </section>
+    @endif
 
     <section class="picker-body field-paper">
         <div class="wrap">

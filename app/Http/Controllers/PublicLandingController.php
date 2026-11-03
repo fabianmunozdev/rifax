@@ -25,6 +25,7 @@ class PublicLandingController extends Controller
                 'numbers as reserved_numbers_count' => fn (Builder $query): Builder => $query->where('status', 'reserved'),
                 'numbers as paid_numbers_count' => fn (Builder $query): Builder => $query->whereIn('status', ['paid', 'winner']),
             ])
+            ->with('earlyPrizes.winnerPurchase.customer')
             ->orderByDesc('is_featured')
             ->orderBy('draw_date')
             ->orderBy('draw_time')

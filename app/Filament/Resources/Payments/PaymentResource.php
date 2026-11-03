@@ -437,11 +437,7 @@ class PaymentResource extends BaseResource
 
     protected static function proofUrl(?PaymentProof $proof): ?string
     {
-        if ($proof === null || blank($proof->storage_path) || $proof->storage_disk !== 'public') {
-            return null;
-        }
-
-        return asset('storage/'.$proof->storage_path);
+        return $proof?->adminUrl();
     }
 
     protected static function paymentStatusColor(?string $state): string

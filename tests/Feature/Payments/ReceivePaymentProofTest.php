@@ -148,7 +148,8 @@ class ReceivePaymentProofTest extends TestCase
         $this->assertSame('admin_payment_proof_submitted', $notification->payload_json['intent'] ?? null);
         $this->assertSame((string) $payment->id, (string) ($notification->payload_json['payment_id'] ?? ''));
         $this->assertStringContainsString('Nuevo comprobante recibido.', $notification->body_text ?? '');
-        $this->assertStringContainsString('/storage/payment-proofs/test-proof.png', $notification->body_text ?? '');
+        $this->assertStringContainsString('/admin/comprobantes/', $notification->body_text ?? '');
+        $this->assertStringNotContainsString('/storage/', $notification->body_text ?? '');
         $this->assertStringContainsString((string) $purchase->id, $notification->body_text ?? '');
     }
 

@@ -428,6 +428,7 @@ return [
                 'description' => 'Descripción',
                 'featured_on_landing' => 'Destacada en la página pública',
                 'price_per_number' => 'Precio por número',
+                'max_numbers_per_customer' => 'Máximo de números por persona',
                 'min_numbers_per_purchase' => 'Mínimo de números por compra',
                 'number_digits' => 'Cantidad de cifras',
                 'random_selection_by_blocks' => 'Aleatoriedad por bloques',
@@ -472,6 +473,7 @@ return [
             ],
             'help' => [
                 'featured_on_landing' => 'Muestra esta rifa como principal en la página pública. Solo una rifa puede estar destacada al mismo tiempo.',
+                'max_numbers_per_customer' => 'Números sin pagar que una misma persona puede tener apartados. Vacío = :default.',
                 'number_digits' => 'Define automáticamente el universo completo de la rifa. Ejemplo: 2 cifras = 100 números (00-99), 3 cifras = 1000, 4 cifras = 10000, 5 cifras = 100000.',
                 'random_selection_by_blocks' => 'Si esta opción está activa, la asignación aleatoria reparte la compra en bloques contiguos del rango completo de la rifa y toma un número disponible por cada bloque. Ejemplo para 3 números en una rifa de 4 cifras: 0000-3333, 3334-6666 y 6667-9999.',
                 'official_result_number' => 'Usa el número oficial publicado por la lotería externa.',
