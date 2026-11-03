@@ -147,6 +147,7 @@
                 <p class="picker-bar-help" id="cta-help-text">{{ $hasConfirm
                     ? 'Confirma tus números y la reserva se crea automáticamente. Recibirás todo por WhatsApp.'
                     : 'Se abrirá un mensaje de WhatsApp listo para enviar. No necesitas editarlo.' }}</p>
+                <p class="picker-bar-help">Al continuar aceptas los <a class="link" href="{{ route('legal.terms') }}" target="_blank">términos y condiciones</a> y la <a class="link" href="{{ route('legal.privacy') }}" target="_blank">política de datos personales</a>.</p>
                 <p class="feedback" id="selection-feedback" aria-live="polite"></p>
             </div>
             <a id="send-selection-link" class="btn btn-accent cta" href="#" aria-disabled="true"
