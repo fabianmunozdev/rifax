@@ -126,6 +126,11 @@ return [
             'singular' => 'Company setting',
             'plural' => 'Company Settings',
         ],
+        'legal_pages' => [
+            'navigation' => 'Legal pages',
+            'singular' => 'legal page',
+            'plural' => 'legal pages',
+        ],
         'content_entries' => [
             'navigation' => 'Content Entries',
             'singular' => 'Content entry',

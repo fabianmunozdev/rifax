@@ -389,11 +389,11 @@
                     @if ($supportPhoneDigits)
                         <li><a class="link" href="https://wa.me/{{ $supportPhoneDigits }}?text={{ rawurlencode('PAGOS') }}">Soporte por WhatsApp</a></li>
                     @endif
-                    @if ($company?->terms_url)
-                        <li><a class="link" href="{{ $company->terms_url }}" target="_blank" rel="noopener noreferrer">Términos</a></li>
+                    @if ($termsUrl)
+                        <li><a class="link" href="{{ $termsUrl }}">Términos y condiciones</a></li>
                     @endif
-                    @if ($company?->privacy_policy_url)
-                        <li><a class="link" href="{{ $company->privacy_policy_url }}" target="_blank" rel="noopener noreferrer">Privacidad</a></li>
+                    @if ($privacyUrl)
+                        <li><a class="link" href="{{ $privacyUrl }}">Datos personales</a></li>
                     @endif
                     @if ($company?->website_url)
                         <li><a class="link" href="{{ $company->website_url }}" target="_blank" rel="noopener noreferrer">Sitio web</a></li>
