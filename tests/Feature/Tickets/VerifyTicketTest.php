@@ -75,12 +75,12 @@ class VerifyTicketTest extends TestCase
             ->assertJsonMissing(['name' => 'Cliente Privado'])
             ->assertJsonMissing(['phone' => '+573001112233']);
 
-        $publicResponse = $this->getJson('/tickets/'.$ticket->verification_token);
+        $publicResponse = $this->getJson('/boleto/'.$ticket->verification_token);
 
         $publicResponse->assertOk()
             ->assertJsonPath('ticket.code', $ticket->code);
 
-        $publicPageResponse = $this->get('/tickets/'.$ticket->verification_token);
+        $publicPageResponse = $this->get('/boleto/'.$ticket->verification_token);
 
         $publicPageResponse->assertOk()
             ->assertSee($ticket->code)

@@ -35,21 +35,21 @@ class CompanySettingResource extends BaseResource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Configuration';
+    protected static string|UnitEnum|null $navigationGroup = 'Configuración';
 
     protected static ?int $navigationSort = 10;
 
-    protected static ?string $navigationLabel = 'Company Settings';
+    protected static ?string $navigationLabel = 'Configuración de empresa';
 
-    protected static ?string $modelLabel = 'Company setting';
+    protected static ?string $modelLabel = 'Configuración de empresa';
 
-    protected static ?string $pluralModelLabel = 'Company Settings';
+    protected static ?string $pluralModelLabel = 'Configuración de empresa';
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Section::make('Company')
+                Section::make('Empresa')
                     ->columns(2)
                     ->schema([
                         TextInput::make('trade_name')
@@ -60,18 +60,18 @@ class CompanySettingResource extends BaseResource
                         TextInput::make('tax_id')
                             ->maxLength(255),
                         TextInput::make('whatsapp_bot_phone')
-                            ->label('WhatsApp bot phone')
+                            ->label('Teléfono del bot de WhatsApp')
                             ->required()
                             ->tel()
                             ->maxLength(255)
                             ->regex('/^\+?[0-9]{8,20}$/')
-                            ->helperText('Phone used by the public web flow to continue purchases in WhatsApp with the bot.'),
+                            ->helperText('Número al que la página pública envía a los compradores para seguir la compra con el bot de WhatsApp.'),
                         TextInput::make('support_phone')
                             ->required()
                             ->tel()
                             ->maxLength(255)
                             ->regex('/^\+?[0-9]{8,20}$/')
-                            ->helperText('Support and operational phone used for manual help and internal payment-proof notifications.'),
+                            ->helperText('Teléfono de soporte para ayuda manual y avisos internos de comprobantes de pago.'),
                         TextInput::make('support_email')
                             ->email()
                             ->maxLength(255),
@@ -101,7 +101,7 @@ class CompanySettingResource extends BaseResource
                             ->required()
                             ->default('America/Bogota'),
                     ]),
-                Section::make('Branding')
+                Section::make('Marca')
                     ->columns(3)
                     ->schema([
                         FileUpload::make('logo_path')
@@ -111,18 +111,18 @@ class CompanySettingResource extends BaseResource
                             ->image()
                             ->imageEditor()
                             ->maxSize(4096)
-                            ->helperText('Upload the company logo. Replacing the file removes the previous image automatically.')
+                            ->helperText('Sube el logo de la empresa. Si lo reemplazas, la imagen anterior se borra.')
                             ->columnSpanFull(),
                         ColorPicker::make('primary_color'),
                         ColorPicker::make('secondary_color'),
                         ColorPicker::make('accent_color'),
                     ]),
-                Section::make('Support')
+                Section::make('Soporte')
                     ->schema([
                         Textarea::make('help_message')
                             ->required()
                             ->rows(5)
-                            ->helperText('Short guidance reused by the WhatsApp-first experience and support touchpoints.'),
+                            ->helperText('Texto corto de ayuda que se usa en WhatsApp y en los puntos de soporte.'),
                     ]),
             ]);
     }
@@ -158,8 +158,8 @@ class CompanySettingResource extends BaseResource
             ->recordActions([
                 EditAction::make(),
             ])
-            ->emptyStateHeading('Company settings not configured')
-            ->emptyStateDescription('Create the single company profile used across tickets, branding and support copy.');
+            ->emptyStateHeading('La empresa aún no está configurada')
+            ->emptyStateDescription('Crea el perfil de la empresa que se usa en los boletos, la marca y los textos de soporte.');
     }
 
     public static function getPages(): array

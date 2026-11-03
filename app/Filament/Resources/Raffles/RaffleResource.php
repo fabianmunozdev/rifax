@@ -123,13 +123,13 @@ class RaffleResource extends BaseResource
                             ->image()
                             ->imageEditor()
                             ->maxSize(4096)
-                            ->helperText('Upload the raffle cover image. Replacing the file removes the previous image automatically.'),
+                            ->helperText('Sube la imagen de portada de la rifa. Si la reemplazas, la imagen anterior se borra.'),
                     ]),
                 Section::make(__('admin.resources.raffles.sections.lottery'))
                     ->columns(2)
                     ->schema([
                         TextInput::make('lottery_text')
-                            ->label('Texto loteria')
+                            ->label('Texto de la lotería')
                             ->maxLength(255),
                         TextInput::make('lottery_name')
                             ->label(__('admin.resources.raffles.fields.lottery'))
@@ -212,7 +212,7 @@ class RaffleResource extends BaseResource
                     ->columns(2)
                     ->schema([
                         TextEntry::make('lottery_text')
-                            ->label('Texto loteria')
+                            ->label('Texto de la lotería')
                             ->placeholder('-'),
                         TextEntry::make('lottery_name')
                             ->label(__('admin.resources.raffles.fields.lottery'))

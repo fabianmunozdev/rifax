@@ -26,6 +26,17 @@ abstract class BaseResource extends Resource
         return static::translateResource('plural', parent::getPluralModelLabel());
     }
 
+    // En español solo va mayúscula inicial: "Registros de auditoría", no "Registros De Auditoría".
+    public static function getTitleCaseModelLabel(): string
+    {
+        return \Illuminate\Support\Str::ucfirst(static::getModelLabel());
+    }
+
+    public static function getTitleCasePluralModelLabel(): string
+    {
+        return \Illuminate\Support\Str::ucfirst(static::getPluralModelLabel());
+    }
+
     public static function getNavigationGroup(): string | UnitEnum | null
     {
         if (blank(static::$navigationGroupTranslationKey)) {

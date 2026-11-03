@@ -49,7 +49,7 @@ class CreateContentEntry extends CreateRecord
         }
 
         throw ValidationException::withMessages([
-            'key' => 'The key must be unique for the selected locale and channel.',
+            'key' => 'La clave no puede repetirse en el mismo idioma y canal.',
         ]);
     }
 

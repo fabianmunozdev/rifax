@@ -45,6 +45,7 @@ sudo tar -czf ~/rifax-pruebas-storage-$(date +%F).tar.gz -C /var/www/rifax stora
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker deploy   # luego cerrar sesión y volver a entrar
+sudo mkdir -p /var/backups/rifax && sudo chown deploy:deploy /var/backups/rifax   # respaldos de deploy.sh
 docker compose version
 ```
 

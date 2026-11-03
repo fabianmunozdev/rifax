@@ -105,7 +105,7 @@ class AdminLocalePreferenceTest extends TestCase
         $this->assertSame('Pago enviado', OperationsUi::purchaseStatusLabel('payment_submitted'));
         $this->assertSame('Entregado', OperationsUi::whatsappProviderStatusLabel('delivered'));
         $this->assertSame('Recordatorio de pago', OperationsUi::whatsappIntentLabel('purchase_payment_reminder'));
-        $this->assertSame('Menu principal', OperationsUi::conversationStatusLabel('main_menu'));
+        $this->assertSame('Menú principal', OperationsUi::conversationStatusLabel('main_menu'));
         $this->assertSame('Salud de revisión financiera', $this->widgetHeading(FinanceReviewHealthWidget::class));
         $this->assertSame('Salud del canal de WhatsApp', $this->widgetHeading(WhatsappChannelHealthWidget::class));
         $this->assertSame('Salud de notificaciones de ganador', $this->widgetHeading(RaffleWinnerNotificationHealthWidget::class));

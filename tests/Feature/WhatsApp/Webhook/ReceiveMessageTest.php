@@ -418,7 +418,7 @@ class ReceiveMessageTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('responses.0.conversation_status', 'purchase_select_numbers');
 
-        $this->assertStringContainsString('/raffles/rifa-visual/number-picker?quantity=2&source=whatsapp_manual_prompt', $response->json('responses.0.reply'));
+        $this->assertStringContainsString('/rifa/rifa-visual?quantity=2&source=whatsapp_manual_prompt', $response->json('responses.0.reply'));
     }
 
     public function test_it_consumes_a_picker_intent_token_and_reserves_the_selected_numbers(): void
@@ -445,7 +445,7 @@ class ReceiveMessageTest extends TestCase
             'selected_numbers_json' => ['001', '543'],
             'metadata_json' => [
                 'referrer_url' => 'https://rifax.test/',
-                'picker_page_url' => 'https://rifax.test/raffles/rifa-picker/number-picker?quantity=2&source=landing_featured',
+                'picker_page_url' => 'https://rifax.test/rifa/rifa-picker?quantity=2&source=landing_featured',
                 'utm_source' => 'facebook',
                 'utm_campaign' => 'lanzamiento',
             ],
