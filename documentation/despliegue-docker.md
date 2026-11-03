@@ -5,7 +5,7 @@ Rifax corre en producción con Docker Compose (`compose.prod.yaml`):
 | Contenedor | Qué hace |
 |---|---|
 | `web` | Caddy: HTTPS automático (Let's Encrypt), sirve archivos públicos y pasa PHP a `app` |
-| `app` | PHP-FPM 8.4 con Laravel, Chromium y Node (boletos PNG) |
+| `app` | PHP-FPM 8.5 con Laravel, Chromium y Node (boletos PNG) |
 | `worker` | Cola: envíos de WhatsApp, boletos, aprobación de pagos |
 | `scheduler` | Tareas programadas: vencimiento de reservas, recordatorios |
 | `postgres` | Base de datos (volumen `pgdata`) |
