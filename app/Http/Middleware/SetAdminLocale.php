@@ -41,6 +41,6 @@ class SetAdminLocale
             }
         }
 
-        return 'en';
+        return 'es';
     }
 }

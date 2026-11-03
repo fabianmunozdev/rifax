@@ -37,7 +37,7 @@ class GenerateTicketForPurchaseAction
 
         if (blank($ticket->public_url)) {
             $ticket->forceFill([
-                'public_url' => url('/tickets/'.$ticket->verification_token),
+                'public_url' => route('tickets.show', $ticket->verification_token),
             ])->save();
         }
 

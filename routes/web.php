@@ -12,19 +12,31 @@ if (app()->environment(['local', 'staging', 'development'])) {
         ->name('tickets.prototype');
 }
 
-Route::get('/tickets/{verificationToken}', [TicketVerificationController::class, 'verifyByToken'])
+// Rutas públicas en español (SEO para público hispano).
+Route::get('/boleto/{verificationToken}', [TicketVerificationController::class, 'verifyByToken'])
     ->name('tickets.show');
 
-Route::get('/raffles/{raffle:slug}/number-picker', [RaffleNumberPickerController::class, 'show'])
+Route::get('/rifa/{raffle:slug}', [RaffleNumberPickerController::class, 'show'])
     ->name('raffles.number-picker');
-Route::get('/raffles/{raffle:slug}/number-picker/numbers', [RaffleNumberPickerController::class, 'numbers'])
+Route::get('/rifa/{raffle:slug}/numeros', [RaffleNumberPickerController::class, 'numbers'])
     ->name('raffles.number-picker.numbers');
-Route::post('/raffles/{raffle:slug}/number-picker/intents', [RaffleNumberPickerController::class, 'store'])
+Route::post('/rifa/{raffle:slug}/apartar', [RaffleNumberPickerController::class, 'store'])
     ->name('raffles.number-picker.intents');
-Route::post('/raffles/{raffle:slug}/number-picker/confirm', [RaffleNumberPickerController::class, 'confirm'])
+Route::post('/rifa/{raffle:slug}/confirmar', [RaffleNumberPickerController::class, 'confirm'])
     ->name('raffles.number-picker.confirm');
-Route::get('/raffles/{raffle:slug}/number-picker/confirmed', [RaffleNumberPickerController::class, 'confirmed'])
+Route::get('/rifa/{raffle:slug}/confirmada', [RaffleNumberPickerController::class, 'confirmed'])
     ->name('raffles.number-picker.confirmed');
+
+// Direcciones anteriores: redirección permanente para no romper enlaces ya compartidos ni QR impresos.
+Route::get('/tickets/{verificationToken}', fn (string $verificationToken) => redirect()->route('tickets.show', $verificationToken, 301));
+Route::get('/raffles/{slug}/number-picker', fn (\Illuminate\Http\Request $request, string $slug) => redirect(
+    route('raffles.number-picker', $slug).($request->getQueryString() ? '?'.$request->getQueryString() : ''),
+    301,
+));
+Route::get('/raffles/{slug}/number-picker/confirmed', fn (\Illuminate\Http\Request $request, string $slug) => redirect(
+    route('raffles.number-picker.confirmed', $slug).($request->getQueryString() ? '?'.$request->getQueryString() : ''),
+    301,
+));
 
 Route::get('/', PublicLandingController::class)
     ->name('landing');

@@ -50,7 +50,7 @@ class RaffleNumberPickerPageTest extends TestCase
             'status' => 'winner',
         ]);
 
-        $response = $this->get('/raffles/rifa-web/number-picker?quantity=2&source=landing_featured&utm_source=facebook&utm_campaign=rifa-julio');
+        $response = $this->get('/rifa/rifa-web?quantity=2&source=landing_featured&utm_source=facebook&utm_campaign=rifa-julio');
 
         $response->assertOk()
             ->assertSee('Rifa Web')
@@ -68,7 +68,7 @@ class RaffleNumberPickerPageTest extends TestCase
             ->assertSee('0 seleccionados de 2', escape: false)
             ->assertSee('Continuar compra por WhatsApp')
             ->assertSee('Se abrirá un mensaje de WhatsApp listo para enviar. No necesitas editarlo.')
-            ->assertSee('/raffles/rifa-web/number-picker/intents?source=landing_featured&amp;utm_source=facebook&amp;utm_campaign=rifa-julio', escape: false);
+            ->assertSee('/rifa/rifa-web/apartar?source=landing_featured&amp;utm_source=facebook&amp;utm_campaign=rifa-julio', escape: false);
     }
 
     public function test_it_returns_not_found_for_a_non_published_raffle(): void
@@ -78,7 +78,7 @@ class RaffleNumberPickerPageTest extends TestCase
             'status' => 'draft',
         ]);
 
-        $response = $this->get('/raffles/'.$raffle->slug.'/number-picker');
+        $response = $this->get('/rifa/'.$raffle->slug);
 
         $response->assertNotFound();
     }
@@ -91,7 +91,7 @@ class RaffleNumberPickerPageTest extends TestCase
             'draw_time' => now()->subMinute()->format('H:i:s'),
         ]);
 
-        $response = $this->get('/raffles/'.$raffle->slug.'/number-picker');
+        $response = $this->get('/rifa/'.$raffle->slug);
 
         $response->assertNotFound();
     }
@@ -110,7 +110,7 @@ class RaffleNumberPickerPageTest extends TestCase
             ]);
         }
 
-        $response = $this->getJson('/raffles/rifa-feed/number-picker/numbers?per_page=24');
+        $response = $this->getJson('/rifa/rifa-feed/numeros?per_page=24');
 
         $response->assertOk()
             ->assertJsonCount(24, 'items')
@@ -120,7 +120,7 @@ class RaffleNumberPickerPageTest extends TestCase
             ->assertJsonPath('items.6.status_label', 'Reservado')
             ->assertJsonPath('next_cursor', '024');
 
-        $nextResponse = $this->getJson('/raffles/rifa-feed/number-picker/numbers?per_page=24&cursor=024');
+        $nextResponse = $this->getJson('/rifa/rifa-feed/numeros?per_page=24&cursor=024');
 
         $nextResponse->assertOk()
             ->assertJsonCount(6, 'items')
@@ -134,7 +134,7 @@ class RaffleNumberPickerPageTest extends TestCase
             'slug' => 'rifa-feed-invalida',
         ]);
 
-        $response = $this->get('/raffles/'.$raffle->slug.'/number-picker/numbers?per_page=5');
+        $response = $this->get('/rifa/'.$raffle->slug.'/numeros?per_page=5');
 
         $response->assertUnprocessable()
             ->assertJsonPath('message', 'Los parametros de carga de numeros no son validos.')
@@ -160,13 +160,13 @@ class RaffleNumberPickerPageTest extends TestCase
 
         $response = $this
             ->withHeader('referer', 'https://rifax.test/?utm_source=facebook')
-            ->postJson('/raffles/rifa-intent/number-picker/intents?source=landing_featured&utm_source=facebook&utm_campaign=rifa-julio', [
+            ->postJson('/rifa/rifa-intent/apartar?source=landing_featured&utm_source=facebook&utm_campaign=rifa-julio', [
                 'quantity' => 2,
                 'selected_numbers' => ['001', '543'],
                 'trace' => [
                     'source' => 'landing_featured',
                     'referrer_url' => 'https://rifax.test/?utm_source=facebook',
-                    'picker_page_url' => 'https://rifax.test/raffles/rifa-intent/number-picker?quantity=2&source=landing_featured&utm_source=facebook&utm_campaign=rifa-julio',
+                    'picker_page_url' => 'https://rifax.test/rifa/rifa-intent?quantity=2&source=landing_featured&utm_source=facebook&utm_campaign=rifa-julio',
                     'utm_source' => 'facebook',
                     'utm_campaign' => 'rifa-julio',
                 ],

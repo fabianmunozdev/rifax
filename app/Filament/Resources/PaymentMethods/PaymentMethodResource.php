@@ -39,21 +39,21 @@ class PaymentMethodResource extends BaseResource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCreditCard;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Configuration';
+    protected static string|UnitEnum|null $navigationGroup = 'Configuración';
 
     protected static ?int $navigationSort = 20;
 
-    protected static ?string $navigationLabel = 'Payment Methods';
+    protected static ?string $navigationLabel = 'Métodos de pago';
 
-    protected static ?string $modelLabel = 'Payment method';
+    protected static ?string $modelLabel = 'Método de pago';
 
-    protected static ?string $pluralModelLabel = 'Payment Methods';
+    protected static ?string $pluralModelLabel = 'Métodos de pago';
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Section::make('Payment Method')
+                Section::make('Método de pago')
                     ->columns(2)
                     ->schema([
                         TextInput::make('name')
@@ -65,11 +65,11 @@ class PaymentMethodResource extends BaseResource
                             ->alphaDash()
                             ->ascii()
                             ->unique(ignoreRecord: true)
-                            ->helperText('Stable machine key used across flows and seeds.'),
+                            ->helperText('Clave interna fija; no la cambies después de crearla.'),
                         Select::make('status')
                             ->options([
-                                'active' => 'Active',
-                                'inactive' => 'Inactive',
+                                'active' => 'Activo',
+                                'inactive' => 'Inactivo',
                             ])
                             ->required()
                             ->default('active')
@@ -85,13 +85,13 @@ class PaymentMethodResource extends BaseResource
                             ->required()
                             ->minValue(0),
                         Toggle::make('is_visible')
-                            ->label('Visible in purchase flow')
+                            ->label('Visible al comprar')
                             ->default(true)
                             ->disabled(fn (Get $get): bool => $get('status') !== 'active')
                             ->dehydrated()
                             ->helperText(fn (Get $get): string => $get('status') === 'active'
-                                ? 'Hidden methods stay configured but are not offered to buyers.'
-                                : 'Inactive methods are automatically hidden from buyers.'),
+                                ? 'Los métodos ocultos se conservan, pero no se ofrecen al comprador.'
+                                : 'Los métodos inactivos se ocultan automáticamente a los compradores.'),
                         TextInput::make('account_holder')
                             ->maxLength(255),
                         TextInput::make('account_reference')
@@ -100,12 +100,12 @@ class PaymentMethodResource extends BaseResource
                             ->requiredIf('status', 'active')
                             ->rows(5)
                             ->columnSpanFull()
-                            ->helperText('Required for active methods so buyers receive actionable payment guidance.'),
+                            ->helperText('Obligatorio en métodos activos, para que el comprador sepa cómo pagar.'),
                         KeyValue::make('details_json')
-                            ->label('Structured details')
+                            ->label('Datos adicionales')
                             ->columnSpanFull()
                             ->reorderable()
-                            ->helperText('Optional metadata such as bank, wallet, account type or phone.'),
+                            ->helperText('Datos opcionales como banco, billetera, tipo de cuenta o teléfono.'),
                     ]),
             ]);
     }
@@ -122,12 +122,13 @@ class PaymentMethodResource extends BaseResource
                     ->copyable(),
                 TextColumn::make('status')
                     ->badge()
+                    ->formatStateUsing(fn (?string $state): string => $state === 'active' ? 'Activo' : 'Inactivo')
                     ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray'),
                 IconColumn::make('is_visible')
                     ->label('Visible')
                     ->boolean(),
                 TextColumn::make('account_reference')
-                    ->label('Reference')
+                    ->label('Referencia')
                     ->limit(30)
                     ->toggleable(),
                 TextColumn::make('sort_order')
@@ -141,11 +142,11 @@ class PaymentMethodResource extends BaseResource
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'active' => 'Active',
-                        'inactive' => 'Inactive',
+                        'active' => 'Activo',
+                        'inactive' => 'Inactivo',
                     ]),
                 TernaryFilter::make('is_visible')
-                    ->label('Visibility'),
+                    ->label('Visibilidad'),
             ])
             ->recordActions([
                 EditAction::make(),

@@ -43,7 +43,7 @@ class EditUser extends EditRecord
                 ->doesntExist()
         ) {
             throw ValidationException::withMessages([
-                'role' => 'At least one active admin account must remain available.',
+                'role' => 'Debe quedar al menos una cuenta de administrador activa.',
             ]);
         }
 

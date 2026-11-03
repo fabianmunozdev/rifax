@@ -73,10 +73,6 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): string => '<link rel="stylesheet" href="'.asset('css/rifax-admin.css').'?v='.@filemtime(public_path('css/rifax-admin.css')).'">',
-            )
-            ->renderHook(
-                PanelsRenderHook::TOPBAR_END,
-                fn (): \Illuminate\Contracts\View\View => View::make('filament.admin.locale-switcher'),
             );
     }
 }
