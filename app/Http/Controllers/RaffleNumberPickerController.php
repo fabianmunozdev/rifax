@@ -62,6 +62,8 @@ class RaffleNumberPickerController extends Controller
             ], fn (mixed $value): bool => $value !== null && $value !== ''))
             : null;
 
+        $raffle->loadMissing('earlyPrizes.winnerPurchase.customer');
+
         return view('raffles.number-picker', [
             'raffle' => $raffle,
             'company' => $company,

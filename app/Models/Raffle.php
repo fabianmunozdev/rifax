@@ -119,6 +119,11 @@ class Raffle extends Model
         return $this->hasMany(RaffleNumber::class);
     }
 
+    public function earlyPrizes(): HasMany
+    {
+        return $this->hasMany(RaffleEarlyPrize::class)->orderBy('draw_date')->orderBy('sort_order')->orderBy('id');
+    }
+
     public function winnerNumber(): HasOne
     {
         return $this->hasOne(RaffleNumber::class)->where('status', 'winner');

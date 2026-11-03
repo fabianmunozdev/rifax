@@ -400,7 +400,9 @@ class RaffleResource extends BaseResource
 
     public static function getRelations(): array
     {
-        return [];
+        return [
+            RelationManagers\EarlyPrizesRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

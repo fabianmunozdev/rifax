@@ -534,3 +534,27 @@ a.chip-number:hover { background: #000; transform: translateY(-2px); }
     *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
     .js .reveal { opacity: 1; transform: none; }
 }
+
+/* Premios anticipados: hoja impresa dentro de la página de la rifa y de la portada. */
+.early-prizes { max-width: 72ch; }
+.early-prizes-lead { margin-top: 0.75rem; }
+.early-prizes-list { margin-top: 2rem; }
+.early-prize .title { font-size: var(--step-lead); }
+.early-prize.is-pending .sheet-status { color: var(--muted); }
+.early-prize.is-void .sheet-status { color: var(--muted); text-decoration: none; }
+.early-prize.is-won .sheet-status { font-weight: 500; }
+.early-prizes-section { padding-block: clamp(2.5rem, 2rem + 3vw, 5rem); }
+.early-prizes-fold-section { padding-block: 1rem; border-bottom: 1px dotted var(--rule, currentColor); }
+.early-prizes-fold { max-width: none; }
+.early-prizes-fold summary {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 1rem;
+  cursor: pointer; list-style: none; min-height: 44px; padding-right: 2rem; position: relative;
+}
+.early-prizes-fold summary::-webkit-details-marker { display: none; }
+.early-prizes-fold summary .title { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; font-size: var(--step-lead); }
+.early-prizes-fold summary::after {
+  content: ""; position: absolute; right: 0.5rem; top: 0.9rem; width: 9px; height: 9px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform 160ms ease-out;
+}
+.early-prizes-fold[open] summary::after { transform: rotate(225deg) translate(-3px, -3px); }
+.early-prizes-fold .early-prizes-list, .early-prizes-fold .early-prizes-lead { max-width: 72ch; }
