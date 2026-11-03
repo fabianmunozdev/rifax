@@ -16,7 +16,8 @@ FROM node:${NODE_VERSION}-trixie-slim AS assets
 WORKDIR /app
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
     CI=true
-RUN corepack enable
+# Node 25+ ya no incluye corepack: pnpm se instala con npm.
+RUN npm install -g pnpm@12.16.1
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 # Tailwind escanea vistas y código PHP para generar solo las clases usadas.
