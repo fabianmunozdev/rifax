@@ -50,11 +50,11 @@ class PaymentResourceActionTest extends TestCase
         );
     }
 
-    public function test_open_payment_proof_action_uses_public_storage_asset_url(): void
+    public function test_open_payment_proof_action_uses_the_authenticated_proof_route(): void
     {
         $payment = Payment::factory()->create();
 
-        PaymentProof::query()->create([
+        $proof = PaymentProof::query()->create([
             'payment_id' => $payment->id,
             'whatsapp_message_id' => null,
             'storage_disk' => 'public',
@@ -69,7 +69,7 @@ class PaymentResourceActionTest extends TestCase
         $payment->load('proofs');
 
         $this->assertSame(
-            asset('storage/payment-proofs/test-proof.png'),
+            route('admin.payment-proofs.show', $proof),
             PaymentResource::makeOpenProofAction()->record($payment)->getUrl(),
         );
     }

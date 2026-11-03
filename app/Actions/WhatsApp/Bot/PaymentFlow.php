@@ -3,6 +3,7 @@
 namespace App\Actions\WhatsApp\Bot;
 
 use App\Actions\Payments\SubmitPaymentProofAction;
+use App\Models\PaymentProof;
 use App\Models\ConversationState;
 use App\Models\Customer;
 use App\Models\Purchase;
@@ -68,7 +69,7 @@ class PaymentFlow
             $this->submitPaymentProofAction->execute(
                 purchase: $purchase,
                 whatsappMessage: $inboundMessage,
-                storagePath: 'whatsapp-proofs/'.$inboundMessage->id.'.jpg',
+                storagePath: PaymentProof::newStoragePath($inboundMessage->id),
                 originalFilename: 'whatsapp-proof-'.$inboundMessage->id.'.jpg',
                 mimeType: 'image/jpeg',
                 metadata: ['replace_previous' => false],
@@ -113,7 +114,7 @@ class PaymentFlow
                     $this->submitPaymentProofAction->execute(
                         purchase: $purchase,
                         whatsappMessage: $inboundMessage,
-                        storagePath: 'whatsapp-proofs/'.$inboundMessage->id.'.jpg',
+                        storagePath: PaymentProof::newStoragePath($inboundMessage->id),
                         originalFilename: 'whatsapp-proof-'.$inboundMessage->id.'.jpg',
                         mimeType: 'image/jpeg',
                         metadata: ['replace_previous_payment_id' => $pendingPayment->id, 'replace_previous' => true],

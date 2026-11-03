@@ -29,6 +29,7 @@ class Raffle extends Model
         'is_featured',
         'number_digits',
         'min_numbers_per_purchase',
+        'max_numbers_per_customer',
         'random_selection_by_blocks',
         'lottery_text',
         'lottery_name',
@@ -55,6 +56,7 @@ class Raffle extends Model
             'is_featured' => 'boolean',
             'number_digits' => 'integer',
             'min_numbers_per_purchase' => 'integer',
+            'max_numbers_per_customer' => 'integer',
             'random_selection_by_blocks' => 'boolean',
             'reservation_timeout_minutes' => 'integer',
         ];
@@ -103,6 +105,31 @@ class Raffle extends Model
         $reference ??= now($drawAt->getTimezone());
 
         return $reference->greaterThanOrEqualTo($drawAt);
+    }
+
+    /**
+     * Máximo de números sin pagar (apartados o con comprobante en revisión)
+     * que un mismo cliente puede tener en esta rifa.
+     */
+    public function maxHeldNumbersPerCustomer(): int
+    {
+        $max = (int) ($this->max_numbers_per_customer ?: config('rifax.purchases.max_held_numbers_per_customer', 100));
+
+        return max($max, (int) $this->min_numbers_per_purchase, 1);
+    }
+
+    /**
+     * Números sin pagar que el cliente ya tiene en esta rifa, sin contar la compra indicada.
+     */
+    public function heldNumbersCountFor(int $customerId, ?int $exceptPurchaseId = null): int
+    {
+        return PurchaseNumber::query()
+            ->join('purchases', 'purchases.id', '=', 'purchase_numbers.purchase_id')
+            ->where('purchases.raffle_id', $this->id)
+            ->where('purchases.customer_id', $customerId)
+            ->whereIn('purchases.status', ['reserved', 'payment_submitted'])
+            ->when($exceptPurchaseId !== null, fn ($query) => $query->where('purchases.id', '!=', $exceptPurchaseId))
+            ->count();
     }
 
     public function salesAreOpen(?Carbon $reference = null): bool

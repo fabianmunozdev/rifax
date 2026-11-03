@@ -97,6 +97,13 @@ class PurchaseFlow
                 .'Intentémoslo de nuevo. ¿Cuántos números deseas comprar?';
         }
 
+        $max = $raffle->maxHeldNumbersPerCustomer();
+
+        if ($quantity > $max) {
+            return "Lo siento, el máximo por persona en esta rifa es {$max} número(s).".PHP_EOL.PHP_EOL
+                .'Intentémoslo de nuevo. ¿Cuántos números deseas comprar?';
+        }
+
         $state->forceFill([
             'status' => 'purchase_choose_mode',
             'requested_quantity' => $quantity,

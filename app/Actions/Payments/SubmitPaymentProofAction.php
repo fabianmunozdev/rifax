@@ -33,7 +33,8 @@ class SubmitPaymentProofAction
         ?int $fileSize = null,
         ?array $metadata = null,
     ): Payment {
-        $storageDisk = 'public';
+        // Disco privado: los comprobantes contienen datos bancarios y solo se sirven al panel con sesión.
+        $storageDisk = PaymentProof::STORAGE_DISK;
         $mediaId = (string) Arr::get($whatsappMessage->payload_json, 'image.id', '');
         $downloadMeta = null;
         $downloadError = null;
@@ -90,7 +91,7 @@ class SubmitPaymentProofAction
             PaymentProof::query()->create([
                 'payment_id' => $payment->id,
                 'whatsapp_message_id' => $whatsappMessage->id,
-                'storage_disk' => 'public',
+                'storage_disk' => PaymentProof::STORAGE_DISK,
                 'storage_path' => $storagePath,
                 'original_filename' => $originalFilename,
                 'mime_type' => $mimeType,

@@ -106,6 +106,12 @@ class RaffleResource extends BaseResource
                             ->required()
                             ->default(1)
                             ->minValue(1),
+                        TextInput::make('max_numbers_per_customer')
+                            ->label(__('admin.resources.raffles.fields.max_numbers_per_customer'))
+                            ->helperText(__('admin.resources.raffles.help.max_numbers_per_customer', ['default' => (int) config('rifax.purchases.max_held_numbers_per_customer', 100)]))
+                            ->numeric()
+                            ->nullable()
+                            ->minValue(1),
                         Toggle::make('random_selection_by_blocks')
                             ->label(__('admin.resources.raffles.fields.random_selection_by_blocks'))
                             ->helperText(__('admin.resources.raffles.help.random_selection_by_blocks'))
@@ -191,6 +197,9 @@ class RaffleResource extends BaseResource
                             ->label(__('admin.resources.raffles.fields.number_digits')),
                         TextEntry::make('min_numbers_per_purchase')
                             ->label(__('admin.resources.raffles.fields.min_numbers_per_purchase')),
+                        TextEntry::make('max_numbers_per_customer')
+                            ->label(__('admin.resources.raffles.fields.max_numbers_per_customer'))
+                            ->state(fn (Raffle $record): int => $record->maxHeldNumbersPerCustomer()),
                         TextEntry::make('random_selection_by_blocks')
                             ->label(__('admin.resources.raffles.fields.random_selection_by_blocks'))
                             ->badge()

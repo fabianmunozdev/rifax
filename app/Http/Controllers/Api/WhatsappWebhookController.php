@@ -20,8 +20,10 @@ class WhatsappWebhookController extends Controller
         $token = (string) $request->query('hub_verify_token');
         $challenge = (string) $request->query('hub_challenge');
 
+        $expectedToken = (string) config('services.whatsapp.webhook_verify_token');
+
         abort_unless(
-            $mode === 'subscribe' && hash_equals(config('services.whatsapp.webhook_verify_token'), $token),
+            $mode === 'subscribe' && $expectedToken !== '' && $token !== '' && hash_equals($expectedToken, $token),
             Response::HTTP_FORBIDDEN,
         );
 
