@@ -110,7 +110,7 @@ body.me .link:hover { color: var(--brand); }
 
 /* ---------- Franja de datos ---------- */
 .me-stats { background: var(--bg-2); border-block: 1px solid var(--line); }
-.me-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem var(--gutter); margin: 0; padding-block: clamp(1.75rem, 4vw, 2.75rem); }
+.me-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem var(--gutter); margin-block: 0; padding-block: clamp(1.75rem, 4vw, 2.75rem); }
 .me-stats dt { font-size: clamp(2rem, 1.4rem + 2vw, 3rem); color: var(--brand); }
 .me-stats dd { margin: 0.4rem 0 0; color: var(--cream-2); font-size: 0.9375rem; max-width: 24ch; }
 @media (max-width: 760px) { .me-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
