@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CompanySetting;
 use App\Models\ContentEntry;
+use App\Models\LegalPage;
 use App\Models\PaymentMethod;
 use App\Models\Raffle;
 use Illuminate\Support\Collection;
@@ -72,6 +73,8 @@ class PublicLandingController extends Controller
             'publicFaqEntries' => $publicFaqEntries,
             'botPhoneDigits' => $this->normalizePhoneDigits($company?->whatsapp_bot_phone),
             'supportPhoneDigits' => $this->normalizePhoneDigits($company?->support_phone),
+            'termsUrl' => LegalPage::findPublished(LegalPage::TERMS)?->publicUrl() ?? $company?->terms_url,
+            'privacyUrl' => LegalPage::findPublished(LegalPage::PRIVACY)?->publicUrl() ?? $company?->privacy_policy_url,
         ]);
     }
 

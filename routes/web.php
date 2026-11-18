@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Admin\PaymentProofController;
 use App\Http\Controllers\AdminLocaleController;
+use App\Http\Controllers\LegalPageController;
+use App\Models\LegalPage;
 use App\Http\Controllers\PublicLandingController;
 use App\Http\Controllers\RaffleNumberPickerController;
 use App\Http\Controllers\Api\TicketVerificationController;
@@ -38,6 +40,11 @@ Route::get('/raffles/{slug}/number-picker/confirmed', fn (\Illuminate\Http\Reque
     route('raffles.number-picker.confirmed', $slug).($request->getQueryString() ? '?'.$request->getQueryString() : ''),
     301,
 ));
+
+Route::get('/terminos-y-condiciones', fn () => app(LegalPageController::class)(LegalPage::TERMS))
+    ->name('legal.terms');
+Route::get('/politica-de-privacidad', fn () => app(LegalPageController::class)(LegalPage::PRIVACY))
+    ->name('legal.privacy');
 
 Route::get('/', PublicLandingController::class)
     ->name('landing');

@@ -126,6 +126,11 @@ return [
             'singular' => 'configuración de empresa',
             'plural' => 'configuraciones de empresa',
         ],
+        'legal_pages' => [
+            'navigation' => 'Páginas legales',
+            'singular' => 'página legal',
+            'plural' => 'páginas legales',
+        ],
         'content_entries' => [
             'navigation' => 'Entradas de contenido',
             'singular' => 'entrada de contenido',
