@@ -196,8 +196,12 @@ body.me .filter-chip.is-active { background: var(--brand); color: var(--brand-in
 /* ---------- Preguntas ---------- */
 .me-faq { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: clamp(1.5rem, 5vw, 4rem); align-items: start; }
 @media (max-width: 900px) { .me-faq { grid-template-columns: minmax(0, 1fr); } }
-body.me .faq-item { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; }
-body.me .faq-item summary { color: var(--cream); }
+body.me .faq-list { margin-top: 0; display: grid; gap: 0.75rem; }
+body.me .faq-item { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; transition: border-color 160ms; }
+body.me .faq-item + .faq-item { margin-top: 0; }
+body.me .faq-item:hover, body.me .faq-item[open] { border-color: color-mix(in srgb, var(--brand) 55%, var(--line)); }
+body.me .faq-item summary { color: var(--cream); padding: 1.1rem 1.4rem; font-weight: 600; }
+body.me .faq-answer { padding: 0 1.4rem 1.25rem; }
 body.me .faq-item summary::after { border-color: var(--brand); }
 body.me .faq-answer { color: var(--cream-2); }
 
