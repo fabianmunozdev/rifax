@@ -464,9 +464,19 @@
         </section>
     @endif
 
-    {{-- 7. Preguntas frecuentes. --}}
+    {{-- 7. Llamado final. --}}
+    @if ($featuredRaffle)
+        <section class="me-final">
+            <div class="wrap reveal">
+                <h2 class="me-display me-final-title">Asegura tu oportunidad <span>hoy</span></h2>
+                <p>Por {{ $money($featuredRaffle->price_per_number) }} participas por {{ $featuredRaffle->title }}{{ $earlyCount > 0 ? ' y ' . ($earlyCount === 1 ? 'un premio anticipado' : $earlyCount . ' premios anticipados') : '' }}.</p>
+                <a class="me-btn me-btn-brand me-btn-lg" href="{{ $pickerUrlFor($featuredRaffle, 'landing_final') }}">Adquiere tu oportunidad</a>
+            </div>
+        </section>
+    @endif
+    {{-- 8. Preguntas frecuentes. --}}
     @if ($publicFaqEntries->isNotEmpty())
-        <section class="me-section" id="preguntas">
+        <section class="me-section me-section-alt" id="preguntas">
             <div class="wrap me-faq">
                 <div>
                     <p class="me-kicker reveal">Dudas</p>
@@ -484,16 +494,6 @@
         </section>
     @endif
 
-    {{-- 8. Llamado final. --}}
-    @if ($featuredRaffle)
-        <section class="me-final">
-            <div class="wrap reveal">
-                <h2 class="me-display me-final-title">Asegura tu oportunidad <span>hoy</span></h2>
-                <p>Por {{ $money($featuredRaffle->price_per_number) }} participas por {{ $featuredRaffle->title }}{{ $earlyCount > 0 ? ' y ' . ($earlyCount === 1 ? 'un premio anticipado' : $earlyCount . ' premios anticipados') : '' }}.</p>
-                <a class="me-btn me-btn-brand me-btn-lg" href="{{ $pickerUrlFor($featuredRaffle, 'landing_final') }}">Adquiere tu oportunidad</a>
-            </div>
-        </section>
-    @endif
 </main>
 
 <footer class="me-footer">
