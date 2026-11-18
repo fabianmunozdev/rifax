@@ -19,7 +19,6 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -395,14 +394,12 @@ class RaffleResource extends BaseResource
                     ->query(fn (Builder $query): Builder => $query->whereNotNull('result_published_at'))
                     ->indicator(__('admin.resources.raffles.filters.with_result')),
             ])
+            // La lista queda liviana: al tocar la fila se abre la vista de la rifa,
+            // donde están las acciones de operación (catálogo, avisos, resultado).
+            ->recordUrl(fn (Raffle $record): string => static::getUrl('view', ['record' => $record]))
             ->recordActions([
-                static::makeProvisionNumbersAction(),
-                static::makeSendDrawReminderAction(),
-                static::makeSendUpcomingAnnouncementAction(),
-                static::makePublishResultAction(),
                 EditAction::make(),
                 DeleteAction::make(),
-                ViewAction::make(),
             ])
             ->toolbarActions([]);
     }
@@ -471,7 +468,11 @@ class RaffleResource extends BaseResource
             ->icon(Heroicon::OutlinedQueueList)
             ->color('info')
             ->visible(fn (): bool => PanelAccess::allows(PanelPermission::RafflesManage))
+            ->hidden(fn (Raffle $record): bool => $record->numbers()->count() >= $record->expectedNumberCatalogCount())
             ->disabled(fn (Raffle $record): bool => ! static::canProvisionNumberCatalog($record))
+            ->tooltip(fn (Raffle $record): ?string => static::canProvisionNumberCatalog($record)
+                ? null
+                : __('admin.resources.raffles.help.generate_full_catalog_draft_only'))
             ->requiresConfirmation()
             ->modalDescription(fn (Raffle $record): string => __('admin.resources.raffles.modals.generate_full_catalog', [
                 'digits' => $record->normalizedNumberDigits(),
