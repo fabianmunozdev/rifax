@@ -62,27 +62,33 @@ body.me .link:hover { color: var(--brand); }
 
 /* ---------- Barra superior ---------- */
 .me-top { position: sticky; top: 0; z-index: 30; background: var(--brand); color: var(--brand-ink); border-bottom: 3px solid var(--hot); }
-.me-top-row { display: flex; align-items: center; gap: clamp(1rem, 3vw, 2.5rem); min-height: 68px; }
+.me-top-row { display: flex; align-items: center; gap: 1rem; min-height: 96px; }
 .me-brand { display: flex; align-items: center; text-decoration: none; margin-right: auto; }
-.me-brand img { height: 44px; width: auto; }
+.me-brand img { height: 64px; width: auto; display: block; }
 .me-brand span { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 1.6rem; text-transform: uppercase; }
-.me-nav { display: flex; gap: clamp(1rem, 2.4vw, 2rem); font-weight: 600; }
-.me-nav a { text-decoration: none; color: var(--brand-ink); }
-.me-nav a:hover { text-decoration: underline; text-underline-offset: 0.25em; }
-@media (max-width: 860px) { .me-nav { display: none; } }
-@media (max-width: 480px) { .me-top .me-btn { padding-inline: 0.9rem; font-size: 0.9375rem; } }
+/* Menú hamburguesa, como en la referencia. */
+.me-menu { position: relative; }
+.me-burger { list-style: none; display: grid; place-items: center; width: 50px; height: 50px; border-radius: 8px; background: var(--bg); color: var(--brand); cursor: pointer; }
+.me-burger::-webkit-details-marker { display: none; }
+.me-burger:hover { background: #000; }
+.me-menu[open] .me-burger { outline: 2px solid var(--bg); outline-offset: 2px; }
+.me-nav { position: absolute; right: 0; top: calc(100% + 0.75rem); min-width: 250px; display: grid; gap: 0.25rem; padding: 0.75rem; background: var(--bg-2); border: 1px solid var(--line); border-top: 3px solid var(--hot); border-radius: 10px; box-shadow: 0 18px 40px rgb(0 0 0 / 0.5); font-weight: 600; }
+.me-nav a:not(.me-btn) { padding: 0.65rem 0.75rem; border-radius: 6px; text-decoration: none; color: var(--cream); }
+.me-nav a:not(.me-btn):hover { background: var(--bg-3); color: var(--brand); }
+.me-nav .me-btn { margin-top: 0.4rem; }
+@media (max-width: 480px) { .me-top-row { min-height: 76px; } .me-brand img { height: 50px; } .me-burger { width: 44px; height: 44px; } }
 
 /* ---------- Portada ---------- */
-.me-hero { padding-block: clamp(2.5rem, 6vw, 5.5rem); background:
-    radial-gradient(60% 70% at 85% 30%, color-mix(in srgb, var(--brand) 9%, transparent), transparent 70%), var(--bg); }
+.me-hero { padding-block: clamp(2.5rem, 6vw, 5.5rem); background: var(--bg); }
 .me-hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: clamp(2rem, 5vw, 4.5rem); align-items: center; }
 @media (max-width: 900px) { .me-hero-grid { grid-template-columns: minmax(0, 1fr); } }
 .me-tag {
     display: inline-block; padding: 0.35rem 0.75rem; border: 1px solid var(--brand); border-radius: 4px;
     color: var(--brand); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
 }
-.me-hero .me-display { margin-top: 1.25rem; font-size: clamp(2.75rem, 1.2rem + 6vw, 6rem); color: var(--cream); text-wrap: balance; }
-.me-sub { margin-top: 0.75rem; font-family: var(--font-display); font-style: italic; font-weight: 800; text-transform: uppercase; font-size: clamp(1.25rem, 1rem + 1vw, 1.75rem); color: var(--brand); }
+.me-hero .me-display { margin-top: 1.5rem; font-size: clamp(3rem, 1.4rem + 5.4vw, 5.75rem); line-height: 0.92; color: var(--cream); }
+.me-hero .me-display span { display: block; color: var(--brand); }
+.me-sub { margin-top: 0.75rem; font-family: var(--font-display); font-style: italic; font-weight: 800; text-transform: uppercase; font-size: clamp(1.25rem, 1rem + 1vw, 1.75rem); color: var(--cream); }
 .me-lead { margin-top: 1.25rem; max-width: 46ch; font-size: var(--step-body); color: var(--cream-2); }
 .me-desc { margin-top: 0.75rem; max-width: 52ch; color: var(--muted-dark); }
 .me-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; margin-top: 2rem; }
@@ -91,12 +97,13 @@ body.me .link:hover { color: var(--brand); }
 .me-alt { margin-top: 1rem; font-size: 0.9375rem; }
 .me-countdown { margin-top: 1.5rem; display: inline-block; padding: 0.5rem 0.9rem; background: var(--bg-2); border-left: 3px solid var(--hot); font-weight: 600; }
 
-.me-photo { position: relative; margin: 0; border: 2px solid var(--brand); border-radius: 10px; overflow: hidden; background: var(--bg-2); aspect-ratio: 4 / 3; display: grid; place-items: center; }
+.me-photo { position: relative; margin: 0; border: 3px solid var(--brand); border-radius: 12px; overflow: hidden; background: var(--bg-2); aspect-ratio: 4 / 3; display: grid; place-items: center; }
 .me-photo img { width: 100%; height: 100%; object-fit: cover; animation: rfx-drift 9s var(--ease-out) both; }
 .me-photo-number { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: clamp(5rem, 14vw, 10rem); color: var(--brand); opacity: 0.85; }
 .me-flag { position: absolute; left: 1rem; bottom: 1rem; padding: 0.35rem 0.7rem; background: var(--hot); color: #fff; border-radius: 4px; font-size: 0.8125rem; font-weight: 700; }
 
-.me-lookup { margin-top: 1.5rem; padding: 1.25rem; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; }
+.me-lookup-band { padding-block: clamp(1.5rem, 3vw, 2.25rem); background: var(--bg); border-bottom: 1px solid var(--line); }
+.me-lookup { max-width: 640px; margin-inline: auto; padding: 1.25rem; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; }
 .me-lookup input { background: var(--bg); color: var(--cream); border-color: var(--line); }
 .me-lookup .chip-number { background: var(--brand); color: var(--brand-ink); }
 .me-lookup .chip-number[aria-disabled="true"] { background: var(--bg-3); color: var(--muted-dark); }
@@ -117,10 +124,13 @@ body.me .link:hover { color: var(--brand); }
 .me-note { margin-top: 2rem; max-width: 60ch; color: var(--cream-2); }
 
 /* Premio mayor: tarjeta amarilla. */
-.me-main-prize { margin-top: clamp(1.75rem, 3vw, 2.5rem); padding: clamp(1.5rem, 4vw, 2.75rem); background: var(--brand); color: var(--brand-ink); border-radius: 10px; }
+.me-main-prize { margin-top: clamp(1.75rem, 3vw, 2.5rem); padding: clamp(1.5rem, 4vw, 2.5rem); background: var(--brand); color: var(--brand-ink); border-radius: 10px; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.25rem 2rem; align-items: center; }
+@media (max-width: 760px) { .me-main-prize { grid-template-columns: minmax(0, 1fr); } }
+.me-main-sub { margin-top: 0.5rem; font-family: var(--font-display); font-style: italic; font-weight: 800; text-transform: uppercase; font-size: clamp(1.25rem, 1rem + 0.8vw, 1.6rem); line-height: 1; }
 .me-main-title { margin-top: 0.75rem; font-size: clamp(2rem, 1.2rem + 3vw, 3.5rem); }
-.me-main-when { margin-top: 1.25rem; padding-left: 1rem; border-left: 3px solid var(--brand-ink); display: grid; gap: 0.15rem; }
-.me-main-when strong { font-weight: 700; font-size: 1.0625rem; }
+.me-main-when { padding-left: 1rem; border-left: 3px solid var(--brand-ink); display: grid; gap: 0.15rem; }
+.me-main-when strong { font-weight: 700; font-size: 1.25rem; }
+.me-main-when span { font-weight: 600; font-size: 0.9375rem; }
 
 /* Premios anticipados: tarjetas oscuras con línea roja arriba. */
 .me-prize-grid { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--gutter); }
@@ -192,22 +202,25 @@ body.me .faq-item summary::after { border-color: var(--brand); }
 body.me .faq-answer { color: var(--cream-2); }
 
 /* ---------- Llamado final ---------- */
-.me-final { padding-block: clamp(4rem, 3rem + 6vw, 8rem); text-align: center; background:
-    radial-gradient(50% 80% at 50% 100%, color-mix(in srgb, var(--hot) 14%, transparent), transparent 70%), var(--bg); }
+.me-final { padding-block: clamp(4rem, 3rem + 6vw, 7rem); text-align: center; background: var(--bg); }
 .me-final-title { font-size: clamp(2.5rem, 1.2rem + 5vw, 5rem); }
 .me-final-title span { color: var(--brand); }
 .me-final p { margin: 1.25rem auto 2rem; max-width: 48ch; color: var(--cream-2); }
 
-/* ---------- Pie ---------- */
-.me-footer { background: #050506; border-top: 3px solid var(--hot); padding-block: clamp(2.5rem, 5vw, 3.5rem) 1.5rem; }
-.me-footer-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)); gap: 2rem var(--gutter); }
-@media (max-width: 760px) { .me-footer-grid { grid-template-columns: minmax(0, 1fr); } }
-.me-footer-logo { height: 56px; width: auto; }
+/* ---------- Pie: una sola fila, como en la referencia ---------- */
+.me-footer { background: #000; border-top: 3px solid var(--hot); padding-block: 2rem; }
+.me-footer-row { display: grid; grid-template-columns: auto repeat(2, minmax(0, 1fr)) auto; gap: 1.5rem clamp(1.5rem, 4vw, 3.5rem); align-items: center; }
+@media (max-width: 760px) { .me-footer-row { grid-template-columns: minmax(0, 1fr); text-align: left; } }
+.me-footer-brand { display: inline-block; }
+.me-footer-logo { height: 64px; width: auto; display: block; }
 .me-footer-name { font-size: 2rem; }
-.me-footer-grid > div > .me-muted { margin-top: 1rem; max-width: 42ch; font-size: 0.9375rem; }
-.me-footer-label { font-weight: 700; color: var(--brand); font-size: 0.8125rem; letter-spacing: 0.1em; text-transform: uppercase; }
-.me-footer-links { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.4rem; font-size: 0.9375rem; }
-.me-imprint { margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); color: var(--muted-dark); font-size: 0.8125rem; }
+.me-footer-label { font-weight: 700; color: var(--cream); }
+.me-footer-phone { display: inline-block; margin-top: 0.4rem; color: var(--brand); font-weight: 700; text-underline-offset: 0.2em; }
+.me-footer-links { margin-top: 0.4rem; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; color: var(--cream-2); font-size: 0.9375rem; }
+.me-footer-links a { color: var(--cream-2); text-underline-offset: 0.2em; }
+.me-footer-links a:hover { color: var(--brand); }
+.me-imprint { color: var(--muted-dark); font-size: 0.875rem; text-align: right; }
+@media (max-width: 760px) { .me-imprint { text-align: left; } }
 
 /* ---------- Barra fija en el celular ---------- */
 @media (max-width: 760px) {

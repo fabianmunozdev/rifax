@@ -69,11 +69,15 @@
     <div class="wrap me-top-row">
         <a class="me-brand" href="{{ url('/') }}" aria-label="{{ $brandName }}, inicio">
             @if ($brandLogoUrl)
-                <img src="{{ $brandLogoUrl }}" alt="{{ $brandName }}" height="44">
+                <img src="{{ $brandLogoUrl }}" alt="{{ $brandName }}" height="64">
             @else
                 <span>{{ $brandName }}</span>
             @endif
         </a>
+        <details class="me-menu" data-menu>
+            <summary class="me-burger" aria-label="Abrir menú">
+                <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            </summary>
         <nav class="me-nav" aria-label="Secciones">
             @if ($featuredRaffle)
                 <a href="#premios">Premios</a>
@@ -85,12 +89,13 @@
             @if ($publicFaqEntries->isNotEmpty())
                 <a href="#preguntas">Preguntas</a>
             @endif
+            @if ($featuredRaffle)
+                <a class="me-btn me-btn-brand" href="{{ $featuredPickerUrl }}">Adquiere tu oportunidad</a>
+            @elseif ($whatsappFor('MENU'))
+                <a class="me-btn me-btn-brand" href="{{ $whatsappFor('MENU') }}">Escribir por WhatsApp</a>
+            @endif
         </nav>
-        @if ($featuredRaffle)
-            <a class="me-btn me-btn-dark" href="{{ $featuredPickerUrl }}">Elegir números</a>
-        @elseif ($whatsappFor('MENU'))
-            <a class="me-btn me-btn-dark" href="{{ $whatsappFor('MENU') }}">Escribir por WhatsApp</a>
-        @endif
+        </details>
     </div>
 </header>
 
@@ -108,7 +113,12 @@
                 @endphp
                 <div class="me-hero-copy">
                     <p class="me-tag">Rifa destacada · {{ $brandName }}</p>
-                    <h1 class="me-display">{{ $featuredRaffle->title }}</h1>
+                    @php
+                        // Como en la referencia: la segunda mitad del título va en amarillo.
+                        $titleWords = preg_split('/\s+/', trim($featuredRaffle->title));
+                        $titleSplit = count($titleWords) > 1 ? (int) ceil(count($titleWords) / 2) : 1;
+                    @endphp
+                    <h1 class="me-display">{{ implode(' ', array_slice($titleWords, 0, $titleSplit)) }}@if (count($titleWords) > 1) <span>{{ implode(' ', array_slice($titleWords, $titleSplit)) }}</span>@endif</h1>
                     @if ($earlyCount > 0)
                         <p class="me-sub">+ {{ $earlyCount }} {{ $earlyCount === 1 ? 'premio anticipado' : 'premios anticipados' }}</p>
                     @endif
@@ -126,7 +136,7 @@
                     @endif
 
                     <div class="me-hero-actions">
-                        <a class="me-btn me-btn-brand me-btn-lg" href="{{ $featuredPickerUrl }}">Elegir números ahora</a>
+                        <a class="me-btn me-btn-brand me-btn-lg" href="{{ $featuredPickerUrl }}">Adquiere tu oportunidad</a>
                         <p class="me-price">Oportunidad a <strong class="num">{{ $money($featuredRaffle->price_per_number) }}</strong></p>
                     </div>
                     @if ($featuredWhatsappUrl)
@@ -150,25 +160,6 @@
                         <figcaption class="me-flag">Premio mayor</figcaption>
                     </figure>
 
-                    <form class="lookup me-lookup" method="get" action="{{ route('raffles.number-picker', $featuredRaffle->slug) }}"
-                          data-lookup data-feed-url="{{ route('raffles.number-picker.numbers', $featuredRaffle->slug) }}"
-                          data-picker-url="{{ $pickerUrlFor($featuredRaffle, 'landing_lookup') }}"
-                          data-digits="{{ (int) $featuredRaffle->number_digits }}">
-                        <input type="hidden" name="quantity" value="{{ max(1, (int) $featuredRaffle->min_numbers_per_purchase) }}">
-                        <input type="hidden" name="source" value="landing_lookup">
-                        @foreach ($landingTracking as $key => $value)
-                            <input type="hidden" name="{{ $key }}" value="{{ $value }}">
-                        @endforeach
-                        <label for="lookup-number">¿Ya tienes un número de la suerte?</label>
-                        <div class="lookup-row">
-                            <input id="lookup-number" name="pick" type="text" inputmode="numeric" pattern="[0-9]*"
-                                   maxlength="{{ (int) $featuredRaffle->number_digits }}" autocomplete="off"
-                                   placeholder="Escribe hasta {{ (int) $featuredRaffle->number_digits }} cifras" aria-describedby="lookup-help">
-                            <button class="me-btn me-btn-brand" type="submit">Buscar</button>
-                        </div>
-                        <p class="lookup-help" id="lookup-help" aria-live="polite" data-lookup-status>Te decimos al instante si está libre.</p>
-                        <div class="lookup-results" data-lookup-results></div>
-                    </form>
                 </div>
             @else
                 <div class="me-hero-copy">
@@ -213,15 +204,45 @@
             </dl>
         </section>
 
+        {{-- Buscador de número, fuera de la portada para dejarla limpia. --}}
+        <section class="me-lookup-band" aria-label="Buscar un número">
+            <div class="wrap">
+            <form class="lookup me-lookup" method="get" action="{{ route('raffles.number-picker', $featuredRaffle->slug) }}"
+                  data-lookup data-feed-url="{{ route('raffles.number-picker.numbers', $featuredRaffle->slug) }}"
+                  data-picker-url="{{ $pickerUrlFor($featuredRaffle, 'landing_lookup') }}"
+                  data-digits="{{ (int) $featuredRaffle->number_digits }}">
+                <input type="hidden" name="quantity" value="{{ max(1, (int) $featuredRaffle->min_numbers_per_purchase) }}">
+                <input type="hidden" name="source" value="landing_lookup">
+                @foreach ($landingTracking as $key => $value)
+                    <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                @endforeach
+                <label for="lookup-number">¿Ya tienes un número de la suerte?</label>
+                <div class="lookup-row">
+                    <input id="lookup-number" name="pick" type="text" inputmode="numeric" pattern="[0-9]*"
+                           maxlength="{{ (int) $featuredRaffle->number_digits }}" autocomplete="off"
+                           placeholder="Escribe hasta {{ (int) $featuredRaffle->number_digits }} cifras" aria-describedby="lookup-help">
+                    <button class="me-btn me-btn-brand" type="submit">Buscar</button>
+                </div>
+                <p class="lookup-help" id="lookup-help" aria-live="polite" data-lookup-status>Te decimos al instante si está libre.</p>
+                <div class="lookup-results" data-lookup-results></div>
+            </form>
+            </div>
+        </section>
+
         {{-- 3. Fechas para ganar: premio mayor y premios anticipados. --}}
         <section class="me-section" id="premios">
             <div class="wrap">
-                <p class="me-kicker reveal">Premios</p>
+                <p class="me-kicker reveal">Eventos</p>
                 <h2 class="me-head reveal">{{ $earlyCount > 0 ? ($earlyCount + 1) . ' fechas para ganar' : 'Lo que te puedes ganar' }}</h2>
 
                 <article class="me-main-prize reveal">
-                    <p class="me-kicker-dark">Premio mayor</p>
-                    <h3 class="me-main-title">{{ $featuredRaffle->title }}</h3>
+                    <div>
+                        <p class="me-kicker-dark">Premio mayor</p>
+                        <h3 class="me-main-title">{{ $featuredRaffle->title }}</h3>
+                        @if ($earlyCount > 0)
+                            <p class="me-main-sub">+ {{ $earlyCount }} {{ $earlyCount === 1 ? 'premio anticipado' : 'premios anticipados' }}</p>
+                        @endif
+                    </div>
                     <p class="me-main-when">
                         <strong>{{ $featuredDraw ? ucfirst($featuredDraw) : 'Fecha por confirmar' }}</strong>
                         @if ($featuredLottery !== '')
@@ -286,7 +307,7 @@
     <section class="me-section me-section-alt" id="como-funciona">
         <div class="wrap me-steps-grid">
             <div>
-                <p class="me-kicker reveal">Cómo funciona</p>
+                <p class="me-kicker reveal">Cómo participar</p>
                 <h2 class="me-head reveal">Asegura tu oportunidad en 3 pasos</h2>
                 <ol class="me-steps">
                     <li class="reveal">
@@ -340,6 +361,9 @@
                 @endif
             </aside>
         </div>
+        @if ($featuredRaffle)
+            <p class="wrap me-center reveal"><a class="me-btn me-btn-brand" href="{{ $pickerUrlFor($featuredRaffle, 'landing_steps') }}">Adquiere tu oportunidad</a></p>
+        @endif
     </section>
 
     {{-- 5. Las demás rifas abiertas (o todas, si no hay destacada). --}}
@@ -473,43 +497,30 @@
 </main>
 
 <footer class="me-footer">
-    <div class="wrap me-footer-grid">
-        <div>
+    <div class="wrap me-footer-row">
+        <a class="me-footer-brand" href="{{ url('/') }}" aria-label="{{ $brandName }}, inicio">
             @if ($brandLogoUrl)
-                <img class="me-footer-logo" src="{{ $brandLogoUrl }}" alt="{{ $brandName }}" height="56">
+                <img class="me-footer-logo" src="{{ $brandLogoUrl }}" alt="{{ $brandName }}" height="64">
             @else
-                <p class="me-display me-footer-name">{{ $brandName }}</p>
+                <span class="me-display me-footer-name">{{ $brandName }}</span>
             @endif
-            <p class="me-muted">{{ $company?->help_message ?: 'Si tienes dudas con un pago o una boleta, escríbenos por WhatsApp y te respondemos en el mismo chat.' }}</p>
-        </div>
-        <div>
-            <p class="me-footer-label">Contacto</p>
-            <ul class="me-footer-links">
-                @if ($supportPhoneDigits)
-                    <li><a class="link" href="https://wa.me/{{ $supportPhoneDigits }}?text={{ rawurlencode('PAGOS') }}">Soporte por WhatsApp</a></li>
-                @endif
-                @if ($company?->support_email)
-                    <li>{{ $company->support_email }}</li>
-                @endif
-                @if ($company?->website_url)
-                    <li><a class="link" href="{{ $company->website_url }}" target="_blank" rel="noopener noreferrer">Sitio web</a></li>
-                @endif
-            </ul>
-        </div>
+        </a>
+        @if ($supportPhoneDigits)
+            <div>
+                <p class="me-footer-label">WhatsApp</p>
+                <a class="me-footer-phone" href="https://wa.me/{{ $supportPhoneDigits }}?text={{ rawurlencode('PAGOS') }}">{{ strlen($supportPhoneDigits) === 12 ? '+' . substr($supportPhoneDigits, 0, 2) . ' ' . substr($supportPhoneDigits, 2, 3) . ' ' . substr($supportPhoneDigits, 5, 3) . ' ' . substr($supportPhoneDigits, 8) : '+' . $supportPhoneDigits }}</a>
+            </div>
+        @endif
         <div>
             <p class="me-footer-label">Legal</p>
-            <ul class="me-footer-links">
-                @if ($termsUrl)
-                    <li><a class="link" href="{{ $termsUrl }}">Términos y condiciones</a></li>
-                @endif
-                @if ($privacyUrl)
-                    <li><a class="link" href="{{ $privacyUrl }}">Datos personales</a></li>
-                @endif
-                <li class="me-muted">Solo mayores de 18 años</li>
-            </ul>
+            <p class="me-footer-links">
+                @if ($termsUrl)<a href="{{ $termsUrl }}">Términos y condiciones</a>@endif
+                @if ($privacyUrl)<a href="{{ $privacyUrl }}">Datos personales</a>@endif
+                @if ($company?->support_email)<span>{{ $company->support_email }}</span>@endif
+            </p>
         </div>
+        <p class="me-imprint">© {{ now()->year }} {{ $company?->legal_name ?: $brandName }}<br>Solo mayores de 18 años</p>
     </div>
-    <p class="wrap me-imprint">© {{ now()->year }} {{ $company?->legal_name ?: $brandName }}</p>
 </footer>
 
 @if ($raffles->isNotEmpty() || $stickyWhatsappUrl)
@@ -524,6 +535,14 @@
 @endif
 
 <script>
+(() => {
+    // El menú se cierra al elegir una sección o al tocar fuera.
+    const menu = document.querySelector('[data-menu]');
+    if (menu) {
+        menu.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => { menu.open = false; }));
+        document.addEventListener('click', (e) => { if (menu.open && !menu.contains(e.target)) menu.open = false; });
+    }
+})();
 (() => {
     // Cuenta regresiva en palabras ("19 días y 4 horas").
     const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
