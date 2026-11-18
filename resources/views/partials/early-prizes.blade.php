@@ -56,8 +56,7 @@
                         <p class="sheet-desc">{!! nl2br(e($prize->description)) !!}</p>
                     @endif
                     <p class="sheet-meta">
-                        {{ $prize->lottery_name }}@if ($prize->lottery_draw_number), sorteo {{ $prize->lottery_draw_number }}@endif
-                        · {{ $formatDraw($prize) }}
+                        {{ $prize->drawSourceLabel() }} · {{ $formatDraw($prize) }}
                     </p>
                     <p class="sheet-status">
                         @switch($status)
@@ -70,7 +69,9 @@
                             @default
                                 Por jugar
                         @endswitch
-                        @if ($prize->result_published_at && $prize->lottery_reference_url)
+                        @if ($prize->isLive() && $prize->lottery_reference_url)
+                            · <a href="{{ $prize->lottery_reference_url }}" target="_blank" rel="noopener noreferrer">{{ $prize->result_published_at ? 'Ver el en vivo' : 'Ir al en vivo' }}</a>
+                        @elseif ($prize->result_published_at && $prize->lottery_reference_url)
                             · <a href="{{ $prize->lottery_reference_url }}" target="_blank" rel="noopener noreferrer">Ver resultado oficial</a>
                         @endif
                     </p>

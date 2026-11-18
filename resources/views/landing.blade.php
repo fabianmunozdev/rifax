@@ -259,7 +259,6 @@
                             return $date;
                         };
                     @endphp
-                    <p class="me-note reveal" id="premios-anticipados">Premios anticipados: se juegan antes del premio mayor con los mismos números. Si ganas uno, sigues jugando por el premio mayor.</p>
                     <ol class="me-prize-grid">
                         @foreach ($featuredRaffle->earlyPrizes as $prize)
                             @php $status = $prize->status(); @endphp
@@ -273,7 +272,17 @@
                                 @if (filled($prize->description))
                                     <p class="me-prize-desc">{!! nl2br(e($prize->description)) !!}</p>
                                 @endif
-                                <p class="me-prize-meta">{{ $prize->lottery_name }}@if ($prize->lottery_draw_number), sorteo {{ $prize->lottery_draw_number }}@endif</p>
+                                <p class="me-prize-meta">
+                                    @if ($prize->isLive())
+                                        <span class="me-live-badge">● En vivo</span>
+                                        {{ $prize->livePlatform() ? 'Por ' . $prize->livePlatform() : 'En nuestras redes' }}
+                                    @else
+                                        {{ $prize->drawSourceLabel() }}
+                                    @endif
+                                </p>
+                                @if ($prize->isLive() && $prize->lottery_reference_url && ! $prize->result_published_at)
+                                    <p class="me-prize-live"><a class="me-btn me-btn-outline" href="{{ $prize->lottery_reference_url }}" target="_blank" rel="noopener noreferrer">Seguir el en vivo{{ $prize->livePlatform() ? ' en ' . $prize->livePlatform() : '' }}</a></p>
+                                @endif
                                 <p class="me-prize-status">
                                     @switch($status)
                                         @case(\App\Models\RaffleEarlyPrize::STATUS_WON)
@@ -286,7 +295,7 @@
                                             Por jugar
                                     @endswitch
                                     @if ($prize->result_published_at && $prize->lottery_reference_url)
-                                        · <a href="{{ $prize->lottery_reference_url }}" target="_blank" rel="noopener noreferrer">Ver resultado oficial</a>
+                                        · <a href="{{ $prize->lottery_reference_url }}" target="_blank" rel="noopener noreferrer">{{ $prize->isLive() ? 'Ver el en vivo' : 'Ver resultado oficial' }}</a>
                                     @endif
                                 </p>
                             </li>
@@ -294,6 +303,9 @@
                     </ol>
                 @endif
 
+                @if ($earlyCount > 0)
+                    <p class="me-note me-note-center reveal" id="premios-anticipados">Premios anticipados: se juegan antes del premio mayor con los mismos números. Si ganas uno, sigues jugando por el premio mayor.</p>
+                @endif
                 <p class="me-center reveal"><a class="me-btn me-btn-brand" href="{{ $pickerUrlFor($featuredRaffle, 'landing_prizes') }}">Adquiere tu oportunidad</a></p>
             </div>
         </section>

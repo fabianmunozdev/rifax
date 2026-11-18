@@ -18,6 +18,10 @@ class RaffleEarlyPrize extends Model
 
     public const STATUS_VOID = 'void';
 
+    public const METHOD_LOTTERY = 'lottery';
+
+    public const METHOD_LIVE = 'live';
+
     /**
      * @var list<string>
      */
@@ -25,6 +29,7 @@ class RaffleEarlyPrize extends Model
         'raffle_id',
         'title',
         'description',
+        'draw_method',
         'image_path',
         'lottery_name',
         'lottery_draw_number',
@@ -106,6 +111,43 @@ class RaffleEarlyPrize extends Model
         }
 
         return $phone ? "Comprador verificado · {$phone}" : 'Comprador verificado';
+    }
+
+    public function isLive(): bool
+    {
+        return $this->draw_method === self::METHOD_LIVE;
+    }
+
+    /**
+     * Nombre de la red del en vivo, sacado del enlace: "Instagram", "TikTok"…
+     */
+    public function livePlatform(): ?string
+    {
+        $host = strtolower((string) parse_url((string) $this->lottery_reference_url, PHP_URL_HOST));
+
+        return match (true) {
+            $host === '' => null,
+            str_contains($host, 'instagram') => 'Instagram',
+            str_contains($host, 'facebook') || str_contains($host, 'fb.') => 'Facebook',
+            str_contains($host, 'tiktok') => 'TikTok',
+            str_contains($host, 'youtube') || str_contains($host, 'youtu.be') => 'YouTube',
+            str_contains($host, 'twitch') => 'Twitch',
+            str_contains($host, 'kick') => 'Kick',
+            str_contains($host, 'x.com') || str_contains($host, 'twitter') => 'X',
+            default => null,
+        };
+    }
+
+    /**
+     * Cómo se juega, para mostrar: "Lotería de Medellín, sorteo 2123" o "En vivo por Instagram".
+     */
+    public function drawSourceLabel(): string
+    {
+        if ($this->isLive()) {
+            return 'En vivo'.($this->livePlatform() ? ' por '.$this->livePlatform() : ' en redes');
+        }
+
+        return trim((string) $this->lottery_name).(filled($this->lottery_draw_number) ? ', sorteo '.$this->lottery_draw_number : '');
     }
 
     public function imageUrl(): ?string

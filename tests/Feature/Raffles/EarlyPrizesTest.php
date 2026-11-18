@@ -171,4 +171,20 @@ class EarlyPrizesTest extends TestCase
 
         $this->assertDatabaseHas('raffle_early_prizes', ['raffle_id' => $raffle->id, 'title' => 'Bono de $200.000']);
     }
+
+    public function test_live_early_prizes_show_the_social_network_from_the_link(): void
+    {
+        $live = new RaffleEarlyPrize([
+            'draw_method' => RaffleEarlyPrize::METHOD_LIVE,
+            'lottery_reference_url' => 'https://www.tiktok.com/@megaelite/live',
+        ]);
+        $lottery = new RaffleEarlyPrize([
+            'lottery_name' => 'Lotería de Medellín',
+            'lottery_draw_number' => '2123',
+        ]);
+
+        $this->assertTrue($live->isLive());
+        $this->assertSame('En vivo por TikTok', $live->drawSourceLabel());
+        $this->assertSame('Lotería de Medellín, sorteo 2123', $lottery->drawSourceLabel());
+    }
 }
