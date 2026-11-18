@@ -15,6 +15,7 @@ class ViewRaffle extends ViewRecord
     {
         return [
             EditAction::make(),
+            RaffleResource::makeProvisionNumbersAction(),
             RaffleResource::makeSendDrawReminderAction(),
             RaffleResource::makeSendUpcomingAnnouncementAction(),
             RaffleResource::makePublishResultAction(),

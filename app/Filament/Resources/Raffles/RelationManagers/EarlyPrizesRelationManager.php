@@ -14,6 +14,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
@@ -69,13 +70,30 @@ class EarlyPrizesRelationManager extends RelationManager
                     ->label('Descripción')
                     ->rows(3)
                     ->columnSpanFull(),
+                ToggleButtons::make('draw_method')
+                    ->label('¿Cómo se juega?')
+                    ->options([
+                        RaffleEarlyPrize::METHOD_LOTTERY => 'Con una lotería',
+                        RaffleEarlyPrize::METHOD_LIVE => 'En vivo en redes',
+                    ])
+                    ->icons([
+                        RaffleEarlyPrize::METHOD_LOTTERY => Heroicon::OutlinedTicket,
+                        RaffleEarlyPrize::METHOD_LIVE => Heroicon::OutlinedVideoCamera,
+                    ])
+                    ->inline()
+                    ->default(RaffleEarlyPrize::METHOD_LOTTERY)
+                    ->required()
+                    ->live()
+                    ->columnSpanFull(),
                 TextInput::make('lottery_name')
                     ->label('Lotería')
                     ->placeholder('Ej. Lotería de Medellín')
-                    ->required()
+                    ->required(fn (Get $get): bool => $get('draw_method') !== RaffleEarlyPrize::METHOD_LIVE)
+                    ->visible(fn (Get $get): bool => $get('draw_method') !== RaffleEarlyPrize::METHOD_LIVE)
                     ->maxLength(255),
                 TextInput::make('lottery_draw_number')
                     ->label('Número de sorteo')
+                    ->visible(fn (Get $get): bool => $get('draw_method') !== RaffleEarlyPrize::METHOD_LIVE)
                     ->maxLength(255),
                 DatePicker::make('draw_date')
                     ->label('Fecha del sorteo')
@@ -96,7 +114,12 @@ class EarlyPrizesRelationManager extends RelationManager
                     ->label('Hora del sorteo')
                     ->seconds(false),
                 TextInput::make('lottery_reference_url')
-                    ->label('URL de resultados')
+                    ->label(fn (Get $get): string => $get('draw_method') === RaffleEarlyPrize::METHOD_LIVE ? 'Enlace del en vivo' : 'URL de resultados')
+                    ->placeholder(fn (Get $get): ?string => $get('draw_method') === RaffleEarlyPrize::METHOD_LIVE ? 'Ej. https://www.instagram.com/megaeliteoficial' : null)
+                    ->helperText(fn (Get $get): ?string => $get('draw_method') === RaffleEarlyPrize::METHOD_LIVE
+                        ? 'La página muestra la red (Instagram, Facebook, TikTok, YouTube…) y un botón para ir al en vivo.'
+                        : null)
+                    ->required(fn (Get $get): bool => $get('draw_method') === RaffleEarlyPrize::METHOD_LIVE)
                     ->url()
                     ->maxLength(255)
                     ->columnSpanFull(),
@@ -125,7 +148,7 @@ class EarlyPrizesRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('title')
                     ->label('Premio')
-                    ->description(fn (RaffleEarlyPrize $record): string => $record->lottery_name)
+                    ->description(fn (RaffleEarlyPrize $record): string => $record->drawSourceLabel())
                     ->wrap()
                     ->searchable(),
                 TextColumn::make('draw_date')
@@ -181,14 +204,18 @@ class EarlyPrizesRelationManager extends RelationManager
             ->visible(fn (RaffleEarlyPrize $record): bool => $record->result_published_at === null
                 && PanelAccess::allows(PanelPermission::RafflesManage))
             ->modalHeading(fn (RaffleEarlyPrize $record): string => 'Resultado: '.$record->title)
-            ->modalDescription(function (): string {
+            ->modalDescription(function (RaffleEarlyPrize $record): string {
                 $digits = $this->getOwnerRecord() instanceof Raffle ? $this->getOwnerRecord()->normalizedNumberDigits() : 4;
+
+                if ($record->isLive()) {
+                    return "Escribe el número que salió en el en vivo ({$digits} cifras): gana la compra pagada con ese número. Si no se vendió, el premio queda desierto. El ganador sigue jugando por el premio mayor.";
+                }
 
                 return "Escribe el número que publicó la lotería. Se toman sus últimas {$digits} cifras: gana la compra pagada con ese número. Si no se vendió, el premio queda desierto. El ganador sigue jugando por el premio mayor.";
             })
             ->schema([
                 TextInput::make('lottery_result')
-                    ->label('Número ganador de la lotería')
+                    ->label(fn (RaffleEarlyPrize $record): string => $record->isLive() ? 'Número ganador del en vivo' : 'Número ganador de la lotería')
                     ->required()
                     ->regex('/^\d{1,10}$/')
                     ->validationMessages(['regex' => 'Escribe solo cifras.'])

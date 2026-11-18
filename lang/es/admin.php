@@ -480,6 +480,7 @@ return [
                 'featured_on_landing' => 'Muestra esta rifa como principal en la página pública. Solo una rifa puede estar destacada al mismo tiempo.',
                 'max_numbers_per_customer' => 'Números sin pagar que una misma persona puede tener apartados. Vacío = :default.',
                 'number_digits' => 'Define automáticamente el universo completo de la rifa. Ejemplo: 2 cifras = 100 números (00-99), 3 cifras = 1000, 4 cifras = 10000, 5 cifras = 100000.',
+                'generate_full_catalog_draft_only' => 'Pasa la rifa a Borrador para generar los números. Después vuelve a publicarla.',
                 'random_selection_by_blocks' => 'Si esta opción está activa, la asignación aleatoria reparte la compra en bloques contiguos del rango completo de la rifa y toma un número disponible por cada bloque. Ejemplo para 3 números en una rifa de 4 cifras: 0000-3333, 3334-6666 y 6667-9999.',
                 'official_result_number' => 'Usa el número oficial publicado por la lotería externa.',
             ],

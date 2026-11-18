@@ -102,11 +102,23 @@ body.me .link:hover { color: var(--brand); }
 .me-photo-number { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: clamp(5rem, 14vw, 10rem); color: var(--brand); opacity: 0.85; }
 .me-flag { position: absolute; left: 1rem; bottom: 1rem; padding: 0.35rem 0.7rem; background: var(--hot); color: #fff; border-radius: 4px; font-size: 0.8125rem; font-weight: 700; }
 
-.me-lookup-band { padding-block: clamp(1.5rem, 3vw, 2.25rem); background: var(--bg); border-bottom: 1px solid var(--line); }
-.me-lookup { max-width: 640px; margin-inline: auto; padding: 1.25rem; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; }
-.me-lookup input { background: var(--bg); color: var(--cream); border-color: var(--line); }
-.me-lookup .chip-number { background: var(--brand); color: var(--brand-ink); }
-.me-lookup .chip-number[aria-disabled="true"] { background: var(--bg-3); color: var(--muted-dark); }
+/* Premio mayor + buscador: una sola pieza dentro del marco amarillo. */
+.me-prize-card { border: 3px solid var(--brand); border-radius: 12px; overflow: hidden; background: var(--brand); }
+.me-prize-card .me-photo { border: 0; border-radius: 0; aspect-ratio: 16 / 10; }
+.me-lookup { margin: 0; padding: clamp(1rem, 2.5vw, 1.4rem); background: var(--brand); color: var(--brand-ink); border: 0; border-radius: 0; }
+.me-lookup-title { display: block; font-family: var(--font-display); font-style: italic; font-weight: 800; text-transform: uppercase; font-size: clamp(1.35rem, 1rem + 1vw, 1.75rem); line-height: 1; color: var(--brand-ink); }
+body.me .me-lookup .lookup-row { margin-top: 0.75rem; display: flex; gap: 0.5rem; }
+body.me .me-lookup input { min-height: 54px; padding: 0 1rem; background: var(--bg); color: var(--cream); border: 2px solid var(--bg); border-radius: 8px; font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 1.75rem; letter-spacing: 0.12em; }
+body.me .me-lookup input::placeholder { color: #55534d; }
+body.me .me-lookup input:focus { outline: none; border-color: var(--hot); }
+.me-lookup .me-btn { min-height: 54px; white-space: nowrap; }
+body.me .me-lookup .lookup-help { margin-top: 0.6rem; color: var(--brand-ink); font-size: 0.875rem; font-weight: 600; opacity: 0.85; }
+body.me .me-lookup .lookup-results { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+body.me .me-lookup .lookup-results:not(:empty) { margin-top: 0.75rem; }
+.me-lookup .chip-number { background: var(--bg); color: var(--cream); border: 0; }
+.me-lookup .chip-number strong { color: var(--brand); }
+.me-lookup .chip-number[aria-disabled="true"] { background: color-mix(in srgb, var(--bg) 25%, var(--brand)); color: var(--brand-ink); }
+.me-lookup .chip-number[aria-disabled="true"] strong { color: inherit; text-decoration: line-through; }
 
 /* ---------- Franja de datos ---------- */
 .me-stats { background: var(--bg-2); border-block: 1px solid var(--line); }
@@ -122,6 +134,11 @@ body.me .link:hover { color: var(--brand); }
 .me-kicker-dark { color: var(--brand-ink); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .me-head { margin-top: 0.5rem; font-size: clamp(2.25rem, 1.3rem + 3.6vw, 4.25rem); color: var(--cream); }
 .me-note { margin-top: 2rem; max-width: 60ch; color: var(--cream-2); }
+.me-note-center { margin: clamp(2rem, 4vw, 3rem) auto 0; text-align: center; }
+.me-note-center + .me-center { margin-top: 1.25rem; }
+.me-live-badge { display: inline-block; margin-right: 0.35rem; padding: 0.1rem 0.5rem; border-radius: 4px; background: var(--hot); color: #fff; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.me-prize-live { margin-top: 0.9rem; }
+.me-prize-live .me-btn { min-height: 40px; padding: 0.5rem 1rem; font-size: 0.9375rem; }
 
 /* Premio mayor: tarjeta amarilla. */
 .me-main-prize { margin-top: clamp(1.75rem, 3vw, 2.5rem); padding: clamp(1.5rem, 4vw, 2.5rem); background: var(--brand); color: var(--brand-ink); border-radius: 10px; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.25rem 2rem; align-items: center; }
@@ -196,8 +213,12 @@ body.me .filter-chip.is-active { background: var(--brand); color: var(--brand-in
 /* ---------- Preguntas ---------- */
 .me-faq { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: clamp(1.5rem, 5vw, 4rem); align-items: start; }
 @media (max-width: 900px) { .me-faq { grid-template-columns: minmax(0, 1fr); } }
-body.me .faq-item { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; }
-body.me .faq-item summary { color: var(--cream); }
+body.me .faq-list { margin-top: 0; display: grid; gap: 0.75rem; }
+body.me .faq-item { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; transition: border-color 160ms; }
+body.me .faq-item + .faq-item { margin-top: 0; }
+body.me .faq-item:hover, body.me .faq-item[open] { border-color: color-mix(in srgb, var(--brand) 55%, var(--line)); }
+body.me .faq-item summary { color: var(--cream); padding: 1.1rem 1.4rem; font-weight: 600; }
+body.me .faq-answer { padding: 0 1.4rem 1.25rem; }
 body.me .faq-item summary::after { border-color: var(--brand); }
 body.me .faq-answer { color: var(--cream-2); }
 

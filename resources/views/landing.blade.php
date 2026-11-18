@@ -151,6 +151,7 @@
                 </div>
 
                 <div class="me-hero-media">
+                    <div class="me-prize-card">
                     <figure class="me-photo">
                         @if ($featuredCover)
                             <img src="{{ $featuredCover }}" alt="Premio: {{ $featuredRaffle->title }}" width="1200" height="900" fetchpriority="high">
@@ -159,6 +160,26 @@
                         @endif
                         <figcaption class="me-flag">Premio mayor</figcaption>
                     </figure>
+                    <form class="lookup me-lookup" method="get" action="{{ route('raffles.number-picker', $featuredRaffle->slug) }}"
+                  data-lookup data-feed-url="{{ route('raffles.number-picker.numbers', $featuredRaffle->slug) }}"
+                  data-picker-url="{{ $pickerUrlFor($featuredRaffle, 'landing_lookup') }}"
+                  data-digits="{{ (int) $featuredRaffle->number_digits }}">
+                <input type="hidden" name="quantity" value="{{ max(1, (int) $featuredRaffle->min_numbers_per_purchase) }}">
+                <input type="hidden" name="source" value="landing_lookup">
+                @foreach ($landingTracking as $key => $value)
+                    <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                @endforeach
+                <label class="me-lookup-title" for="lookup-number">¿Ya tienes tu número de la suerte?</label>
+                <div class="lookup-row">
+                    <input id="lookup-number" name="pick" type="text" inputmode="numeric" pattern="[0-9]*"
+                           maxlength="{{ (int) $featuredRaffle->number_digits }}" autocomplete="off"
+                           placeholder="{{ str_repeat('0', max(1, (int) $featuredRaffle->number_digits)) }}" aria-describedby="lookup-help">
+                    <button class="me-btn me-btn-dark" type="submit">¿Está libre?</button>
+                </div>
+                <p class="lookup-help" id="lookup-help" aria-live="polite" data-lookup-status data-initial="Escribe hasta {{ (int) $featuredRaffle->number_digits }} cifras y te decimos al instante si está libre.">Escribe hasta {{ (int) $featuredRaffle->number_digits }} cifras y te decimos al instante si está libre.</p>
+                <div class="lookup-results" data-lookup-results></div>
+            </form>
+                    </div>
 
                 </div>
             @else
@@ -204,31 +225,6 @@
             </dl>
         </section>
 
-        {{-- Buscador de número, fuera de la portada para dejarla limpia. --}}
-        <section class="me-lookup-band" aria-label="Buscar un número">
-            <div class="wrap">
-            <form class="lookup me-lookup" method="get" action="{{ route('raffles.number-picker', $featuredRaffle->slug) }}"
-                  data-lookup data-feed-url="{{ route('raffles.number-picker.numbers', $featuredRaffle->slug) }}"
-                  data-picker-url="{{ $pickerUrlFor($featuredRaffle, 'landing_lookup') }}"
-                  data-digits="{{ (int) $featuredRaffle->number_digits }}">
-                <input type="hidden" name="quantity" value="{{ max(1, (int) $featuredRaffle->min_numbers_per_purchase) }}">
-                <input type="hidden" name="source" value="landing_lookup">
-                @foreach ($landingTracking as $key => $value)
-                    <input type="hidden" name="{{ $key }}" value="{{ $value }}">
-                @endforeach
-                <label for="lookup-number">¿Ya tienes un número de la suerte?</label>
-                <div class="lookup-row">
-                    <input id="lookup-number" name="pick" type="text" inputmode="numeric" pattern="[0-9]*"
-                           maxlength="{{ (int) $featuredRaffle->number_digits }}" autocomplete="off"
-                           placeholder="Escribe hasta {{ (int) $featuredRaffle->number_digits }} cifras" aria-describedby="lookup-help">
-                    <button class="me-btn me-btn-brand" type="submit">Buscar</button>
-                </div>
-                <p class="lookup-help" id="lookup-help" aria-live="polite" data-lookup-status>Te decimos al instante si está libre.</p>
-                <div class="lookup-results" data-lookup-results></div>
-            </form>
-            </div>
-        </section>
-
         {{-- 3. Fechas para ganar: premio mayor y premios anticipados. --}}
         <section class="me-section" id="premios">
             <div class="wrap">
@@ -263,7 +259,6 @@
                             return $date;
                         };
                     @endphp
-                    <p class="me-note reveal" id="premios-anticipados">Premios anticipados: se juegan antes del premio mayor con los mismos números. Si ganas uno, sigues jugando por el premio mayor.</p>
                     <ol class="me-prize-grid">
                         @foreach ($featuredRaffle->earlyPrizes as $prize)
                             @php $status = $prize->status(); @endphp
@@ -277,7 +272,17 @@
                                 @if (filled($prize->description))
                                     <p class="me-prize-desc">{!! nl2br(e($prize->description)) !!}</p>
                                 @endif
-                                <p class="me-prize-meta">{{ $prize->lottery_name }}@if ($prize->lottery_draw_number), sorteo {{ $prize->lottery_draw_number }}@endif</p>
+                                <p class="me-prize-meta">
+                                    @if ($prize->isLive())
+                                        <span class="me-live-badge">● En vivo</span>
+                                        {{ $prize->livePlatform() ? 'Por ' . $prize->livePlatform() : 'En nuestras redes' }}
+                                    @else
+                                        {{ $prize->drawSourceLabel() }}
+                                    @endif
+                                </p>
+                                @if ($prize->isLive() && $prize->lottery_reference_url && ! $prize->result_published_at)
+                                    <p class="me-prize-live"><a class="me-btn me-btn-outline" href="{{ $prize->lottery_reference_url }}" target="_blank" rel="noopener noreferrer">Seguir el en vivo{{ $prize->livePlatform() ? ' en ' . $prize->livePlatform() : '' }}</a></p>
+                                @endif
                                 <p class="me-prize-status">
                                     @switch($status)
                                         @case(\App\Models\RaffleEarlyPrize::STATUS_WON)
@@ -290,7 +295,7 @@
                                             Por jugar
                                     @endswitch
                                     @if ($prize->result_published_at && $prize->lottery_reference_url)
-                                        · <a href="{{ $prize->lottery_reference_url }}" target="_blank" rel="noopener noreferrer">Ver resultado oficial</a>
+                                        · <a href="{{ $prize->lottery_reference_url }}" target="_blank" rel="noopener noreferrer">{{ $prize->isLive() ? 'Ver el en vivo' : 'Ver resultado oficial' }}</a>
                                     @endif
                                 </p>
                             </li>
@@ -298,6 +303,9 @@
                     </ol>
                 @endif
 
+                @if ($earlyCount > 0)
+                    <p class="me-note me-note-center reveal" id="premios-anticipados">Premios anticipados: se juegan antes del premio mayor con los mismos números. Si ganas uno, sigues jugando por el premio mayor.</p>
+                @endif
                 <p class="me-center reveal"><a class="me-btn me-btn-brand" href="{{ $pickerUrlFor($featuredRaffle, 'landing_prizes') }}">Adquiere tu oportunidad</a></p>
             </div>
         </section>
@@ -464,9 +472,19 @@
         </section>
     @endif
 
-    {{-- 7. Preguntas frecuentes. --}}
+    {{-- 7. Llamado final. --}}
+    @if ($featuredRaffle)
+        <section class="me-final">
+            <div class="wrap reveal">
+                <h2 class="me-display me-final-title">Asegura tu oportunidad <span>hoy</span></h2>
+                <p>Por {{ $money($featuredRaffle->price_per_number) }} participas por {{ $featuredRaffle->title }}{{ $earlyCount > 0 ? ' y ' . ($earlyCount === 1 ? 'un premio anticipado' : $earlyCount . ' premios anticipados') : '' }}.</p>
+                <a class="me-btn me-btn-brand me-btn-lg" href="{{ $pickerUrlFor($featuredRaffle, 'landing_final') }}">Adquiere tu oportunidad</a>
+            </div>
+        </section>
+    @endif
+    {{-- 8. Preguntas frecuentes. --}}
     @if ($publicFaqEntries->isNotEmpty())
-        <section class="me-section" id="preguntas">
+        <section class="me-section me-section-alt" id="preguntas">
             <div class="wrap me-faq">
                 <div>
                     <p class="me-kicker reveal">Dudas</p>
@@ -484,16 +502,6 @@
         </section>
     @endif
 
-    {{-- 8. Llamado final. --}}
-    @if ($featuredRaffle)
-        <section class="me-final">
-            <div class="wrap reveal">
-                <h2 class="me-display me-final-title">Asegura tu oportunidad <span>hoy</span></h2>
-                <p>Por {{ $money($featuredRaffle->price_per_number) }} participas por {{ $featuredRaffle->title }}{{ $earlyCount > 0 ? ' y ' . ($earlyCount === 1 ? 'un premio anticipado' : $earlyCount . ' premios anticipados') : '' }}.</p>
-                <a class="me-btn me-btn-brand me-btn-lg" href="{{ $pickerUrlFor($featuredRaffle, 'landing_final') }}">Adquiere tu oportunidad</a>
-            </div>
-        </section>
-    @endif
 </main>
 
 <footer class="me-footer">
@@ -607,7 +615,7 @@
         input.addEventListener('input', () => {
             input.value = input.value.replace(/\D+/g, '').slice(0, digits || 6);
             clearTimeout(timer);
-            if (input.value === '') { results.replaceChildren(); status.textContent = 'Te decimos al instante si está libre.'; return; }
+            if (input.value === '') { results.replaceChildren(); status.textContent = status.dataset.initial; return; }
             timer = setTimeout(() => search(input.value), 220);
         });
     }

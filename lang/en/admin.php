@@ -480,6 +480,7 @@ return [
                 'featured_on_landing' => 'Use this raffle as the main public hero. Only one raffle can be featured at a time.',
                 'max_numbers_per_customer' => 'Unpaid numbers one customer can hold. Empty = :default.',
                 'number_digits' => 'Defines the full raffle universe automatically. Example: 2 digits = 100 numbers (00-99), 3 digits = 1000, 4 digits = 10000, 5 digits = 100000.',
+                'generate_full_catalog_draft_only' => 'Move the raffle to Draft to generate its numbers, then publish it again.',
                 'random_selection_by_blocks' => 'When enabled, random assignment splits the full raffle range into contiguous blocks and takes one available number from each block. Example for 3 numbers in a 4-digit raffle: 0000-3333, 3334-6666, and 6667-9999.',
                 'official_result_number' => 'Use the official number published by the external lottery.',
             ],
