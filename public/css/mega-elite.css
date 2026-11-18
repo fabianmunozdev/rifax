@@ -102,11 +102,23 @@ body.me .link:hover { color: var(--brand); }
 .me-photo-number { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: clamp(5rem, 14vw, 10rem); color: var(--brand); opacity: 0.85; }
 .me-flag { position: absolute; left: 1rem; bottom: 1rem; padding: 0.35rem 0.7rem; background: var(--hot); color: #fff; border-radius: 4px; font-size: 0.8125rem; font-weight: 700; }
 
-.me-lookup-band { padding-block: clamp(1.5rem, 3vw, 2.25rem); background: var(--bg); border-bottom: 1px solid var(--line); }
-.me-lookup { max-width: 640px; margin-inline: auto; padding: 1.25rem; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; }
-.me-lookup input { background: var(--bg); color: var(--cream); border-color: var(--line); }
-.me-lookup .chip-number { background: var(--brand); color: var(--brand-ink); }
-.me-lookup .chip-number[aria-disabled="true"] { background: var(--bg-3); color: var(--muted-dark); }
+/* Premio mayor + buscador: una sola pieza dentro del marco amarillo. */
+.me-prize-card { border: 3px solid var(--brand); border-radius: 12px; overflow: hidden; background: var(--brand); }
+.me-prize-card .me-photo { border: 0; border-radius: 0; aspect-ratio: 16 / 10; }
+.me-lookup { margin: 0; padding: clamp(1rem, 2.5vw, 1.4rem); background: var(--brand); color: var(--brand-ink); border: 0; border-radius: 0; }
+.me-lookup-title { display: block; font-family: var(--font-display); font-style: italic; font-weight: 800; text-transform: uppercase; font-size: clamp(1.35rem, 1rem + 1vw, 1.75rem); line-height: 1; color: var(--brand-ink); }
+body.me .me-lookup .lookup-row { margin-top: 0.75rem; display: flex; gap: 0.5rem; }
+body.me .me-lookup input { min-height: 54px; padding: 0 1rem; background: var(--bg); color: var(--cream); border: 2px solid var(--bg); border-radius: 8px; font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 1.75rem; letter-spacing: 0.12em; }
+body.me .me-lookup input::placeholder { color: #55534d; }
+body.me .me-lookup input:focus { outline: none; border-color: var(--hot); }
+.me-lookup .me-btn { min-height: 54px; white-space: nowrap; }
+body.me .me-lookup .lookup-help { margin-top: 0.6rem; color: var(--brand-ink); font-size: 0.875rem; font-weight: 600; opacity: 0.85; }
+body.me .me-lookup .lookup-results { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+body.me .me-lookup .lookup-results:not(:empty) { margin-top: 0.75rem; }
+.me-lookup .chip-number { background: var(--bg); color: var(--cream); border: 0; }
+.me-lookup .chip-number strong { color: var(--brand); }
+.me-lookup .chip-number[aria-disabled="true"] { background: color-mix(in srgb, var(--bg) 25%, var(--brand)); color: var(--brand-ink); }
+.me-lookup .chip-number[aria-disabled="true"] strong { color: inherit; text-decoration: line-through; }
 
 /* ---------- Franja de datos ---------- */
 .me-stats { background: var(--bg-2); border-block: 1px solid var(--line); }
